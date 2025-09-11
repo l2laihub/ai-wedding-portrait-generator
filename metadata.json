@@ -1,0 +1,5 @@
+{
+  "name": "AI Wedding Portrait Generator",
+  "description": "Upload a photo of a couple and this AI-powered application will transform it into a beautiful wedding day portrait using Google's 'gemini-2.5-flash-image-preview' model.",
+  "requestFramePermissions": []
+}
