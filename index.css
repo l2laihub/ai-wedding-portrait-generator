@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default light theme */
+body {
+  background-color: #f8fafc; /* bg-slate-50 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background-color 0.3s ease;
+}
+
+/* Dark theme - ensure it works with both html.dark and body.dark */
+html.dark body,
+body.dark {
+  background-color: #111827 !important; /* bg-gray-900 with higher specificity */
+}
+
+/* Comprehensive dark mode fallbacks */
+.dark body {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+}
+
+.dark header {
+  background-color: rgba(17, 24, 39, 0.95) !important;
+  border-color: #374151 !important;
+}
+
+.dark .bg-white {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: #374151 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #1f2937 !important;
+}
+
+.dark .text-gray-900 {
+  color: #ffffff !important;
+}
+
+.dark .text-gray-600 {
+  color: #d1d5db !important;
+}
+
+.dark .text-gray-500 {
+  color: #9ca3af !important;
+}
+
+.dark .border-gray-200 {
+  border-color: #374151 !important;
+}
+
+.dark .border-gray-300 {
+  border-color: #4b5563 !important;
+}
+
+/* Safe area insets for mobile devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Prevent zoom on input focus for iOS */
+input[type="text"], input[type="file"], textarea {
+  font-size: 16px;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #7C3AED;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8B5CF6;
+}
