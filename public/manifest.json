@@ -1,0 +1,101 @@
+{
+  "name": "WedAI - AI Wedding Portraits by HuyBuilds",
+  "short_name": "WedAI",
+  "description": "Transform your couple photos into magical AI-generated wedding portraits. Choose from 6 unique wedding styles at wedai.huybuilds.app",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#7C3AED",
+  "background_color": "#111827",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["photo", "entertainment", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "/screenshots/mobile-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/desktop-1.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "features": [
+    "AI wedding portrait generation",
+    "6 unique wedding styles",
+    "Mobile-first design",
+    "Free downloads with timestamps",
+    "Social sharing integration",
+    "HuyBuilds app ecosystem"
+  ],
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "Generate Wedding Portraits",
+      "short_name": "Generate",
+      "description": "Upload a couple photo to generate AI wedding portraits with WedAI",
+      "url": "/?action=upload",
+      "icons": [
+        {
+          "src": "/icons/upload-icon.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}

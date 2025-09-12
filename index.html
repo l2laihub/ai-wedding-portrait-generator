@@ -2,12 +2,182 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Wedding Portrait Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>WedAI - AI Wedding Portrait Generator by HuyBuilds</title>
+    <meta name="description" content="WedAI by HuyBuilds - Transform your couple photos into magical AI-generated wedding portraits. Choose from 6 unique wedding styles. 100% free to use at wedai.huybuilds.app" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Theme colors -->
+    <meta name="theme-color" content="#3B82F6" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="msapplication-TileColor" content="#7C3AED" />
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/icons/icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
+    
+    <!-- Mobile app configuration -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Wedding AI" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Windows tiles -->
+    <meta name="msapplication-square70x70logo" content="/icons/icon-70x70.png" />
+    <meta name="msapplication-square150x150logo" content="/icons/icon-150x150.png" />
+    <meta name="msapplication-square310x310logo" content="/icons/icon-310x310.png" />
+    
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" href="/assets/wedai_logo_notext_nobg.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AI Wedding Portrait Generator" />
+    <meta property="og:description" content="Transform couples into beautiful wedding portraits using AI" />
+    <meta property="og:image" content="/icons/social-preview.png" />
+    <meta property="og:url" content="https://your-domain.com" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AI Wedding Portrait Generator" />
+    <meta name="twitter:description" content="Transform couples into beautiful wedding portraits using AI" />
+    <meta name="twitter:image" content="/icons/social-preview.png" />
+    
+    <!-- Performance optimizations -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" />
+    <link rel="dns-prefetch" href="https://aistudiocdn.com" />
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Configure Tailwind before it initializes
+      tailwind.config = {
+        darkMode: 'class',
+        content: ['./**/*.{html,js,ts,jsx,tsx}'],
+        theme: {
+          extend: {
+            animation: {
+              'spin': 'spin 1s linear infinite',
+            }
+          }
+        }
+      }
+      console.log('Tailwind config set:', tailwind.config);
+      
+      // Force Tailwind to recognize dark mode classes
+      document.addEventListener('DOMContentLoaded', function() {
+        if (window.tailwind) {
+          console.log('Forcing Tailwind refresh after DOM load');
+          setTimeout(() => {
+            if (window.tailwind.refresh) {
+              window.tailwind.refresh();
+            }
+          }, 100);
+        }
+      });
+    </script>
     <style>
+      /* Default light theme */
       body {
-        background-color: #111827; /* bg-gray-900 */
+        background-color: #f8fafc; /* bg-slate-50 */
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        transition: background-color 0.3s ease;
+      }
+      
+      /* Dark theme - ensure it works with both html.dark and body.dark */
+      html.dark body,
+      body.dark {
+        background-color: #111827 !important; /* bg-gray-900 with higher specificity */
+      }
+      
+      /* Comprehensive dark mode fallbacks */
+      .dark body {
+        background-color: #111827 !important;
+        color: #ffffff !important;
+      }
+      
+      .dark header {
+        background-color: rgba(17, 24, 39, 0.95) !important;
+        border-color: #374151 !important;
+      }
+      
+      .dark .bg-white {
+        background-color: #1f2937 !important;
+      }
+      
+      .dark .bg-gray-100 {
+        background-color: #374151 !important;
+      }
+      
+      .dark .bg-gray-50 {
+        background-color: #1f2937 !important;
+      }
+      
+      .dark .text-gray-900 {
+        color: #ffffff !important;
+      }
+      
+      .dark .text-gray-600 {
+        color: #d1d5db !important;
+      }
+      
+      .dark .text-gray-500 {
+        color: #9ca3af !important;
+      }
+      
+      .dark .border-gray-200 {
+        border-color: #374151 !important;
+      }
+      
+      .dark .border-gray-300 {
+        border-color: #4b5563 !important;
+      }
+      
+      /* Test styles to verify dark mode is working */
+      .test-dark-mode {
+        background: red;
+      }
+      
+      .dark .test-dark-mode {
+        background: green;
+      }
+      
+      /* Safe area insets for mobile devices */
+      .safe-area-top {
+        padding-top: env(safe-area-inset-top);
+      }
+      
+      .safe-area-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      
+      /* Prevent zoom on input focus for iOS */
+      input[type="text"], input[type="file"], textarea {
+        font-size: 16px;
+      }
+      
+      /* Custom scrollbar for webkit browsers */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: #374151;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #7C3AED;
+        border-radius: 3px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #8B5CF6;
       }
     </style>
   <script type="importmap">
@@ -21,9 +191,76 @@
 }
 </script>
 </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+  <body class="safe-area-top safe-area-bottom">
+    <noscript>
+      <div style="text-align: center; padding: 50px 20px; color: white;">
+        <h1>JavaScript Required</h1>
+        <p>You need to enable JavaScript to run this AI Wedding Portrait Generator.</p>
+        <p>This app uses modern web technologies to create beautiful wedding portraits.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      // Register service worker for PWA functionality
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+              
+              // Check for updates
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      // New version available
+                      if (confirm('A new version of the app is available. Reload to update?')) {
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        window.location.reload();
+                      }
+                    }
+                  });
+                }
+              });
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+      
+      // Handle app install prompt
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('Install prompt available');
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show custom install button or banner
+        // You can add UI here to prompt user to install
+      });
+      
+      // Handle successful app install
+      window.addEventListener('appinstalled', (evt) => {
+        console.log('App was installed successfully');
+        // Track installation analytics here
+      });
+      
+      // Handle online/offline status
+      window.addEventListener('online', () => {
+        console.log('App is online');
+        // Optionally show online indicator
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('App is offline');
+        // Optionally show offline indicator
+      });
+    </script>
+    
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
