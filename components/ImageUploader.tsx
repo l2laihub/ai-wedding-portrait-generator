@@ -126,8 +126,6 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
           accept="image/*"
           onChange={handleFileChange}
           disabled={isProcessing}
-          // Add mobile-specific attributes
-          capture="environment"
         />
         
         {isProcessing ? (
