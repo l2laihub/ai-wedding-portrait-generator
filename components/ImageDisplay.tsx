@@ -1,12 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GeneratedContent } from '../types';
 import Icon from './Icon';
 import { useViewport } from '../hooks/useViewport';
 import { useLazyImage } from '../hooks/useIntersectionObserver';
 import { useTouch } from '../hooks/useTouch';
+import { posthogService } from '../services/posthogService';
 
 interface ImageDisplayProps {
   contents: GeneratedContent[];
+  generationId?: string;
 }
 
 // Helper function to generate timestamp
@@ -23,10 +25,13 @@ const generateTimestamp = (): string => {
   return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
 };
 
-// Download handler with timestamp
-const handleDownload = async (imageUrl: string, style: string) => {
+// Download handler with timestamp and tracking
+const handleDownload = async (imageUrl: string, style: string, generationId?: string) => {
   const timestamp = generateTimestamp();
   const filename = `wedding-portrait-${style.toLowerCase().replace(/ /g, '-')}_${timestamp}.png`;
+  
+  // Track download event
+  posthogService.trackImageDownloaded(style, generationId || 'unknown');
   
   const link = document.createElement('a');
   link.href = imageUrl;
@@ -108,22 +113,35 @@ const LazyImage: React.FC<{ src: string; alt: string; className: string }> = ({ 
   );
 };
 
-const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number }> = ({ content, index }) => {
+const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; generationId?: string }> = ({ content, index, generationId }) => {
   const { imageUrl, text, style = 'portrait' } = content;
   const { isMobile } = useViewport();
   const [showActions, setShowActions] = useState(false);
+  const [hasBeenViewed, setHasBeenViewed] = useState(false);
 
   const handleDownloadClick = useCallback(() => {
     if (imageUrl) {
-      handleDownload(imageUrl, style);
+      handleDownload(imageUrl, style, generationId);
     }
-  }, [imageUrl, style]);
+  }, [imageUrl, style, generationId]);
 
   const handleShareClick = useCallback(() => {
     if (imageUrl) {
       handleShare(imageUrl, style);
     }
   }, [imageUrl, style]);
+
+  // Track when style is viewed (image loads successfully)
+  useEffect(() => {
+    if (imageUrl && !hasBeenViewed) {
+      const timer = setTimeout(() => {
+        posthogService.trackStyleViewed(style, generationId || 'unknown');
+        setHasBeenViewed(true);
+      }, 1000); // Track after 1 second of viewing
+      
+      return () => clearTimeout(timer);
+    }
+  }, [imageUrl, style, generationId, hasBeenViewed]);
 
   // Touch handlers for mobile interaction
   const touchHandlers = useTouch({
@@ -265,7 +283,7 @@ const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number }>
   );
 };
 
-const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents }) => {
+const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId }) => {
   const { isMobile } = useViewport();
 
   if (!contents || contents.length === 0) {
@@ -297,6 +315,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents }) => {
             key={content.style || index} 
             content={content} 
             index={index}
+            generationId={generationId}
           />
         ))}
       </div>

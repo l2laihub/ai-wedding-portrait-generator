@@ -15,6 +15,8 @@ import { editImageWithNanoBanana } from './services/geminiService';
 import { GeneratedContent } from './types';
 import { useViewport } from './hooks/useViewport';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { posthogService } from './services/posthogService';
+// import { useAppFeatureFlags, FEATURE_FLAGS } from './hooks/useFeatureFlags';
 
 const ALL_WEDDING_STYLES = [
   "Classic & Timeless Wedding",
@@ -31,21 +33,48 @@ const getRandomWeddingStyles = () => {
   return shuffled.slice(0, 3);
 };
 
-function App() {
+interface AppProps {
+  navigate: (route: 'home' | 'privacy' | 'terms') => void;
+}
+
+function App({ navigate }: AppProps) {
   const [sourceImageFile, setSourceImageFile] = useState<File | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
   const [generatedContents, setGeneratedContents] = useState<GeneratedContent[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
+  const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
   
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
+  // Temporarily disable feature flags to prevent race conditions
+  // const { flags: featureFlags } = useAppFeatureFlags();
+  const featureFlags = { enable_sequential_generation: false };
 
-  // Preload critical components on app mount
+  // Preload critical components on app mount and identify user
   useEffect(() => {
     preloadCriticalComponents();
+    
+    // Generate or retrieve user ID for analytics
+    let userId = localStorage.getItem('wedai_user_id');
+    if (!userId) {
+      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('wedai_user_id', userId);
+    }
+    
+    // Identify user in PostHog
+    posthogService.identify(userId, {
+      timestamp: Date.now(),
+      source: 'app_load',
+      userAgent: navigator.userAgent,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      devicePixelRatio: window.devicePixelRatio,
+      language: navigator.language,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
   }, []);
 
   const handleImageUpload = (file: File) => {
@@ -53,6 +82,14 @@ function App() {
     setSourceImageUrl(URL.createObjectURL(file));
     setGeneratedContents(null); // Clear previous results
     setError(null);
+  };
+  
+  // Track prompt modifications
+  const handleCustomPromptChange = (newPrompt: string) => {
+    setCustomPrompt(newPrompt);
+    if (newPrompt.length > 0) {
+      posthogService.trackPromptModified(newPrompt);
+    }
   };
 
   const handleGenerate = async () => {
@@ -70,12 +107,24 @@ function App() {
     setError(null);
     setGeneratedContents(null);
 
+    // Generate unique ID for this generation session
+    const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setCurrentGenerationId(generationId);
+
     try {
       // Get 3 random wedding styles for this generation
       const stylesToGenerate = getRandomWeddingStyles();
       
-      // Adjust generation strategy for slow connections
-      const generateSequentially = isSlowConnection && isMobile;
+      // Track generation started
+      posthogService.trackGenerationStarted(generationId, {
+        styles: stylesToGenerate,
+        customPrompt: customPrompt || undefined,
+        generationId,
+        timestamp: Date.now(),
+      });
+      
+      // Adjust generation strategy for slow connections or feature flag
+      const generateSequentially = (isSlowConnection && isMobile) || featureFlags.enable_sequential_generation;
       
       if (generateSequentially) {
         // Generate one at a time to reduce network load
@@ -86,10 +135,32 @@ function App() {
           const prompt = `Transform the couple in the image into a beautiful wedding portrait with a "${style}" theme. ${customPrompt}. Make them look like they are dressed for a wedding in that style.`;
           
           try {
+            const styleStartTime = Date.now();
             const content = await editImageWithNanoBanana(sourceImageFile, prompt);
+            const styleDuration = Date.now() - styleStartTime;
+            
+            // Track successful style generation
+            posthogService.trackStyleGenerated({
+              style,
+              generationId,
+              duration: styleDuration,
+              success: true,
+            });
+            
             finalContents.push({ ...content, style });
           } catch (err) {
+            const styleDuration = Date.now() - (Date.now() - 1000); // Approximate
             console.error(`Error generating style "${style}":`, err);
+            
+            // Track failed style generation
+            posthogService.trackStyleGenerated({
+              style,
+              generationId,
+              duration: styleDuration,
+              success: false,
+              error: err instanceof Error ? err.message : 'Unknown error',
+            });
+            
             finalContents.push({
               imageUrl: null,
               text: err instanceof Error ? err.message : 'An unknown error occurred.',
@@ -100,12 +171,45 @@ function App() {
           // Update UI with partial results for better UX
           setGeneratedContents([...finalContents]);
         }
+        
+        // Track generation completed for sequential mode
+        const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
+        const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
+        posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
       } else {
         // Generate all styles concurrently (original behavior)
         const generationPromises = stylesToGenerate.map(style => {
+          const styleStartTime = Date.now();
           const prompt = `Transform the couple in the image into a beautiful wedding portrait with a "${style}" theme. ${customPrompt}. Make them look like they are dressed for a wedding in that style.`;
+          
           return editImageWithNanoBanana(sourceImageFile, prompt)
-                   .then(content => ({ ...content, style }));
+            .then(content => {
+              const styleDuration = Date.now() - styleStartTime;
+              
+              // Track successful style generation
+              posthogService.trackStyleGenerated({
+                style,
+                generationId,
+                duration: styleDuration,
+                success: true,
+              });
+              
+              return { ...content, style };
+            })
+            .catch(err => {
+              const styleDuration = Date.now() - styleStartTime;
+              
+              // Track failed style generation
+              posthogService.trackStyleGenerated({
+                style,
+                generationId,
+                duration: styleDuration,
+                success: false,
+                error: err instanceof Error ? err.message : 'Unknown error',
+              });
+              
+              throw err;
+            });
         });
         
         const results = await Promise.allSettled(generationPromises);
@@ -124,6 +228,15 @@ function App() {
         });
         
         setGeneratedContents(finalContents);
+        
+        // Track generation completed for concurrent mode
+        const successfulStyles = results
+          .filter((result, index) => result.status === 'fulfilled')
+          .map((_, index) => stylesToGenerate[index]);
+        const failedStyles = results
+          .filter((result, index) => result.status === 'rejected')
+          .map((_, index) => stylesToGenerate[index]);
+        posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
 
         if (results.some(r => r.status === 'rejected')) {
           setError("Some portrait styles could not be generated. Please check the console for details.");
@@ -132,11 +245,12 @@ function App() {
 
     } catch (err) {
       // This outer catch is for logic errors, not the API calls themselves
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred during the generation process.");
-      }
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred during the generation process.";
+      
+      // Track generation failure
+      posthogService.trackGenerationFailed(generationId, errorMessage);
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +284,7 @@ function App() {
               onSubmit={handleGenerate} 
               isLoading={isLoading}
               customPrompt={customPrompt}
-              onCustomPromptChange={setCustomPrompt}
+              onCustomPromptChange={handleCustomPromptChange}
             />
           )}
 
@@ -201,7 +315,7 @@ function App() {
           )}
 
           {generatedContents && (
-            <SuspenseImageDisplay contents={generatedContents} />
+            <SuspenseImageDisplay contents={generatedContents} generationId={currentGenerationId} />
           )}
 
           {/* How it works - only show when no image uploaded */}
@@ -221,7 +335,7 @@ function App() {
                     <span className="text-2xl">✨</span>
                   </div>
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-lg transition-colors duration-300">2. AI Magic</h4>
-                  <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Our AI generates 3 unique wedding portraits from 6 beautiful styles</p>
+                  <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Our AI generates 3 unique wedding portraits from 6+ beautiful styles</p>
                 </div>
                 <div className="text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -237,7 +351,7 @@ function App() {
       </main>
       
       {/* Simple Clean Footer */}
-      <SimpleFooter />
+      <SimpleFooter navigate={navigate} />
       
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />

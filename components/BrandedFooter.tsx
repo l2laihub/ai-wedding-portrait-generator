@@ -25,7 +25,7 @@ const BrandedFooter: React.FC = () => {
   const footerLinks = [
     { name: 'Privacy Policy', url: '#' },
     { name: 'Terms of Service', url: '#' },
-    { name: 'Contact', url: 'mailto:hello@huybuilds.com' }
+    { name: 'Contact', url: 'mailto:huybuilds@gmail.com' }
   ];
 
   return (

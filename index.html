@@ -47,21 +47,7 @@
     <meta name="twitter:description" content="Transform couples into beautiful wedding portraits using AI" />
     <meta name="twitter:image" content="/icons/social-preview.png" />
     
-    <!-- Performance optimizations -->
-    <link rel="preconnect" href="https://cdn.tailwindcss.com" />
-    <link rel="dns-prefetch" href="https://aistudiocdn.com" />
-    
     <!-- Vite will inject CSS here during build -->
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.19.0"
-  }
-}
-</script>
 </head>
   <body class="safe-area-top safe-area-bottom">
     <noscript>
@@ -75,33 +61,80 @@
     
     <!-- Service Worker Registration -->
     <script>
-      // Register service worker for PWA functionality
+      console.log('🔍 DEBUG: Checking environment...', {
+        hostname: location.hostname,
+        protocol: location.protocol,
+        port: location.port
+      });
+      
+      // ULTRA-DEBUG: Force unregister ALL service workers in development
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-              
-              // Check for updates
-              registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
-                if (newWorker) {
-                  newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      // New version available
-                      if (confirm('A new version of the app is available. Reload to update?')) {
-                        newWorker.postMessage({ type: 'SKIP_WAITING' });
-                        window.location.reload();
-                      }
-                    }
-                  });
-                }
+        const isDevelopment = location.hostname === 'localhost' || 
+                             location.hostname === '127.0.0.1' || 
+                             location.hostname.includes('localhost') ||
+                             location.port === '5173';
+        
+        console.log('🔍 DEBUG: Is development?', isDevelopment);
+        
+        if (isDevelopment) {
+          console.log('🧹 DEVELOPMENT MODE: Aggressively removing all service workers...');
+          
+          // Method 1: Unregister all registrations
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            console.log('🔍 Found registrations:', registrations.length);
+            registrations.forEach(function(registration, index) {
+              console.log(`🗑️ Unregistering SW ${index + 1}:`, registration.scope);
+              registration.unregister().then(() => {
+                console.log(`✅ SW ${index + 1} unregistered successfully`);
               });
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
             });
-        });
+          });
+          
+          // Method 2: Force reload service worker state
+          if (navigator.serviceWorker.controller) {
+            console.log('🔄 Forcing SW controller to update...');
+            navigator.serviceWorker.controller.postMessage({type: 'SKIP_WAITING'});
+          }
+          
+          // Method 3: Listen for controlling changes
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('🔄 SW controller changed, reloading...');
+            window.location.reload();
+          });
+          
+          console.log('🚫 DEVELOPMENT: Service worker registration BLOCKED');
+          
+        } else {
+          console.log('🚀 PRODUCTION: Registering service worker...');
+          
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then((registration) => {
+                console.log('✅ SW registered: ', registration);
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                  const newWorker = registration.installing;
+                  if (newWorker) {
+                    newWorker.addEventListener('statechange', () => {
+                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // New version available
+                        if (confirm('A new version of the app is available. Reload to update?')) {
+                          newWorker.postMessage({ type: 'SKIP_WAITING' });
+                          window.location.reload();
+                        }
+                      }
+                    });
+                  }
+                });
+              })
+              .catch((registrationError) => {
+                console.log('❌ SW registration failed: ', registrationError);
+              });
+          });
+        }
+      } else {
+        console.log('🚫 Service worker not supported');
       }
       
       // Handle app install prompt

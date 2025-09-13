@@ -1,7 +1,11 @@
 import React from 'react';
 import Icon from './Icon';
 
-const SimpleFooter: React.FC = () => {
+interface SimpleFooterProps {
+  navigate?: (route: 'home' | 'privacy' | 'terms') => void;
+}
+
+const SimpleFooter: React.FC<SimpleFooterProps> = ({ navigate }) => {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -90,14 +94,27 @@ const SimpleFooter: React.FC = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400">
             <div className="text-center md:text-left">
-              © {currentYear} HuyBuilds. All rights reserved. WedAI is free to use.
+              <div>© {currentYear} HuyBuilds. All rights reserved. WedAI is free to use.</div>
+              <div className="text-xs mt-1 text-gray-400 dark:text-gray-500">
+                We use anonymous analytics to improve the app.
+              </div>
             </div>
             <div className="flex items-center gap-6">
-              <a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Privacy</a>
+              <button 
+                onClick={() => navigate?.('privacy')} 
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+              >
+                Privacy
+              </button>
               <span className="text-gray-400 dark:text-gray-600">•</span>
-              <a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Terms</a>
+              <button 
+                onClick={() => navigate?.('terms')} 
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+              >
+                Terms
+              </button>
               <span className="text-gray-400 dark:text-gray-600">•</span>
-              <a href="mailto:hello@huybuilds.com" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Contact</a>
+              <a href="mailto:huybuilds@gmail.com" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Contact</a>
             </div>
           </div>
         </div>

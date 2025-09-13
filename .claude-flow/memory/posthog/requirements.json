@@ -1,0 +1,116 @@
+{
+  "analyzed": true,
+  "timestamp": "2025-09-13T10:00:00Z",
+  "app_structure": {
+    "framework": "React 19 with TypeScript and Vite",
+    "main_flow": "Image Upload → AI Generation → Display Results",
+    "key_components": {
+      "App.tsx": "Main orchestrator, manages state and generation flow",
+      "ImageUploader": "File upload and drag-drop functionality",
+      "PromptInput": "Custom prompt input and generation trigger",
+      "ImageDisplay": "Results display with download/share functionality",
+      "geminiService": "AI API integration for image generation"
+    },
+    "styling": "Tailwind CSS with dark theme support",
+    "pwa_features": "Service worker, manifest, mobile optimizations"
+  },
+  "user_journey": {
+    "steps": [
+      {
+        "step": 1,
+        "action": "Page Load",
+        "component": "App.tsx",
+        "description": "User arrives at the landing page"
+      },
+      {
+        "step": 2,
+        "action": "Image Upload",
+        "component": "ImageUploader",
+        "description": "User uploads couple photo via drag-drop or file picker"
+      },
+      {
+        "step": 3,
+        "action": "Custom Prompt (Optional)",
+        "component": "PromptInput",
+        "description": "User adds custom prompt details"
+      },
+      {
+        "step": 4,
+        "action": "Generate Click",
+        "component": "PromptInput",
+        "description": "User clicks generate button to start AI processing"
+      },
+      {
+        "step": 5,
+        "action": "AI Generation",
+        "component": "App.tsx + geminiService",
+        "description": "3 wedding styles generated concurrently or sequentially"
+      },
+      {
+        "step": 6,
+        "action": "View Results",
+        "component": "ImageDisplay",
+        "description": "User views generated portraits"
+      },
+      {
+        "step": 7,
+        "action": "Download/Share",
+        "component": "ImageDisplay",
+        "description": "User downloads or shares generated images"
+      }
+    ]
+  },
+  "key_metrics_to_track": {
+    "user_interactions": [
+      "Page views and sessions",
+      "Image upload attempts and successes",
+      "Custom prompt usage",
+      "Generation button clicks",
+      "Download counts per style",
+      "Share actions per style",
+      "PWA install prompts and completions"
+    ],
+    "performance_metrics": [
+      "Page load time",
+      "Image upload time",
+      "AI generation time (total and per style)",
+      "Time to first portrait displayed",
+      "Network connection quality impact"
+    ],
+    "error_tracking": [
+      "Upload failures",
+      "Generation failures (by style)",
+      "Network errors",
+      "API errors from Gemini service"
+    ],
+    "feature_usage": [
+      "Which wedding styles are most popular",
+      "Custom prompt vs default generation",
+      "Mobile vs desktop usage",
+      "Dark mode usage",
+      "Slow connection mode triggers"
+    ],
+    "conversion_funnel": [
+      "Landing → Upload",
+      "Upload → Generate",
+      "Generate → Download/Share",
+      "Session → PWA Install"
+    ]
+  },
+  "lead_capture_opportunities": {
+    "current_state": "No lead capture implemented",
+    "potential_points": [
+      "After successful generation (highest intent)",
+      "Before download (value exchange)",
+      "PWA install prompt",
+      "Share action completion"
+    ]
+  },
+  "technical_considerations": {
+    "api_key_security": "Using environment variables via Vite",
+    "state_management": "React hooks (useState, useEffect)",
+    "async_operations": "Promise.allSettled for concurrent generation",
+    "mobile_optimizations": "Viewport hooks, network status detection",
+    "lazy_loading": "Suspense components for code splitting"
+  }
+}

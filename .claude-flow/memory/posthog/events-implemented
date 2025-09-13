@@ -1,0 +1,130 @@
+## PostHog Events Implementation Reference
+
+### User Journey Events
+
+#### 1. App Load & User Identification
+- **Event**: `app_loaded`
+- **Properties**: 
+  - url, referrer, userAgent, screenWidth, screenHeight, devicePixelRatio
+- **Event**: `user_identified`
+- **Properties**: 
+  - timestamp, source, userAgent, screenWidth, screenHeight, devicePixelRatio, language, timezone
+
+#### 2. Image Upload Events
+- **Event**: `image_upload_started`
+- **Properties**: 
+  - fileSize, fileType, uploadMethod ('drag' | 'click')
+- **Event**: `image_upload_completed`
+- **Properties**: 
+  - fileSize, fileType, uploadMethod, uploadDuration
+- **Event**: `image_upload_failed`
+- **Properties**: 
+  - fileSize, fileType, uploadMethod, error
+
+#### 3. Generation Lifecycle Events
+- **Event**: `generation_started`
+- **Properties**: 
+  - styles[], customPrompt?, generationId, timestamp
+- **Event**: `generation_completed`
+- **Properties**: 
+  - generationId, duration, successfulStyles[], failedStyles[], totalStyles, successRate
+- **Event**: `generation_failed`
+- **Properties**: 
+  - generationId, duration, error
+
+#### 4. Individual Style Events
+- **Event**: `style_generated`
+- **Properties**: 
+  - style, generationId, duration, success, error?
+- **Event**: `style_viewed`
+- **Properties**: 
+  - style, generationId
+  - *Triggered after 1 second of viewing*
+
+#### 5. User Interaction Events
+- **Event**: `image_downloaded`
+- **Properties**: 
+  - style, generationId
+- **Event**: `prompt_modified`
+- **Properties**: 
+  - customPrompt, promptLength
+
+#### 6. Feature Flag Events
+- **Event**: `feature_flag_accessed`
+- **Properties**: 
+  - flagKey, flagValue
+
+### Event Flow Example
+
+```
+1. User loads app
+   → app_loaded
+   → user_identified
+
+2. User uploads image
+   → image_upload_started
+   → image_upload_completed
+
+3. User modifies prompt (optional)
+   → prompt_modified
+
+4. User triggers generation
+   → generation_started
+   → style_generated (x3, one for each style)
+   → generation_completed
+
+5. User views results
+   → style_viewed (x3, after 1 second each)
+
+6. User downloads image
+   → image_downloaded
+```
+
+### Analytics Insights Available
+
+#### Conversion Funnel
+1. App loads → User uploads image
+2. Image uploaded → Generation started
+3. Generation started → Generation completed
+4. Results viewed → Image downloaded
+
+#### Performance Metrics
+- Upload durations
+- Generation durations per style
+- Total session time
+- Success/failure rates
+
+#### User Behavior
+- Most popular styles (by generation + viewing)
+- Download rates per style
+- Prompt modification patterns
+- Feature flag adoption
+
+#### Technical Metrics
+- Device/browser distribution
+- Network performance impact
+- Error rates and causes
+- Feature flag effectiveness
+
+### Event Properties Schema
+
+#### Common Properties
+- `timestamp`: Unix timestamp
+- `generationId`: Unique session identifier
+- `style`: Wedding style name
+
+#### File Properties
+- `fileSize`: Number (bytes)
+- `fileType`: MIME type string
+- `uploadMethod`: 'drag' | 'click'
+
+#### Performance Properties
+- `duration`: Number (milliseconds)
+- `success`: Boolean
+- `error`: String (error message)
+
+#### User Properties
+- `userAgent`: Browser/device string
+- `screenWidth/Height`: Display dimensions
+- `language`: Browser language
+- `timezone`: User timezone

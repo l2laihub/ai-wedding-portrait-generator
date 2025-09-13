@@ -1,0 +1,274 @@
+{
+  "plan_version": "1.0.0",
+  "created_at": "2025-09-13T10:00:00Z",
+  "overview": "Comprehensive PostHog analytics integration for AI Wedding Portrait Generator",
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Foundation Setup",
+      "description": "Install PostHog and set up core tracking infrastructure",
+      "tasks": [
+        {
+          "id": "1.1",
+          "task": "Install PostHog React SDK",
+          "command": "npm install posthog-js",
+          "files_to_modify": ["package.json"]
+        },
+        {
+          "id": "1.2",
+          "task": "Create PostHog configuration",
+          "files_to_create": ["src/services/posthog.ts"],
+          "config_needed": {
+            "api_key": "VITE_POSTHOG_KEY",
+            "api_host": "VITE_POSTHOG_HOST or https://app.posthog.com"
+          }
+        },
+        {
+          "id": "1.3",
+          "task": "Initialize PostHog in app entry",
+          "files_to_modify": ["src/index.tsx"],
+          "implementation": "Import and initialize PostHog before React render"
+        },
+        {
+          "id": "1.4",
+          "task": "Create analytics context/hook",
+          "files_to_create": ["src/hooks/useAnalytics.ts"],
+          "purpose": "Centralized analytics API for components"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Core Event Tracking",
+      "description": "Implement tracking for main user interactions",
+      "tasks": [
+        {
+          "id": "2.1",
+          "task": "Track page views and sessions",
+          "files_to_modify": ["src/App.tsx"],
+          "events": ["page_view", "session_start"]
+        },
+        {
+          "id": "2.2",
+          "task": "Track image upload events",
+          "files_to_modify": ["src/components/ImageUploader.tsx"],
+          "events": [
+            "image_upload_started",
+            "image_upload_completed",
+            "image_upload_failed",
+            "drag_drop_used"
+          ]
+        },
+        {
+          "id": "2.3",
+          "task": "Track generation events",
+          "files_to_modify": ["src/components/PromptInput.tsx", "src/App.tsx"],
+          "events": [
+            "generation_started",
+            "custom_prompt_added",
+            "generation_completed",
+            "generation_failed",
+            "style_generated"
+          ]
+        },
+        {
+          "id": "2.4",
+          "task": "Track results interactions",
+          "files_to_modify": ["src/components/ImageDisplay.tsx"],
+          "events": [
+            "portrait_viewed",
+            "portrait_downloaded",
+            "portrait_shared",
+            "share_method_used"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Performance Monitoring",
+      "description": "Track performance metrics and API usage",
+      "tasks": [
+        {
+          "id": "3.1",
+          "task": "Track generation performance",
+          "files_to_modify": ["src/services/geminiService.ts"],
+          "metrics": [
+            "api_call_duration",
+            "api_response_size",
+            "generation_time_per_style"
+          ]
+        },
+        {
+          "id": "3.2",
+          "task": "Track page performance",
+          "files_to_create": ["src/hooks/usePerformanceTracking.ts"],
+          "metrics": [
+            "page_load_time",
+            "time_to_interactive",
+            "component_render_time"
+          ]
+        },
+        {
+          "id": "3.3",
+          "task": "Track network status impact",
+          "files_to_modify": ["src/hooks/useNetworkStatus.ts"],
+          "metrics": [
+            "slow_connection_sessions",
+            "offline_attempts",
+            "sequential_vs_concurrent_generation"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "User Properties & Cohorts",
+      "description": "Set up user identification and properties",
+      "tasks": [
+        {
+          "id": "4.1",
+          "task": "Implement user identification",
+          "approach": "Anonymous ID with optional email capture",
+          "properties": [
+            "device_type",
+            "viewport_size",
+            "theme_preference",
+            "pwa_installed",
+            "generation_count"
+          ]
+        },
+        {
+          "id": "4.2",
+          "task": "Track feature flags",
+          "features_to_flag": [
+            "show_all_6_styles",
+            "enable_custom_prompts",
+            "show_pwa_prompt",
+            "enable_lead_capture"
+          ]
+        },
+        {
+          "id": "4.3",
+          "task": "Create user cohorts",
+          "cohorts": [
+            "High-value users (3+ generations)",
+            "Mobile users",
+            "PWA installers",
+            "Share enthusiasts"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Lead Capture Integration",
+      "description": "Implement optional email capture for high-intent users",
+      "tasks": [
+        {
+          "id": "5.1",
+          "task": "Create lead capture modal",
+          "files_to_create": ["src/components/LeadCaptureModal.tsx"],
+          "trigger_points": [
+            "After 2nd generation",
+            "Before download (optional)",
+            "On PWA install"
+          ]
+        },
+        {
+          "id": "5.2",
+          "task": "Track lead capture events",
+          "events": [
+            "lead_capture_shown",
+            "lead_capture_submitted",
+            "lead_capture_dismissed",
+            "email_validation_failed"
+          ]
+        },
+        {
+          "id": "5.3",
+          "task": "Integrate with CRM/Email",
+          "options": [
+            "PostHog webhook to email service",
+            "Direct API integration",
+            "Zapier/Make automation"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Advanced Analytics",
+      "description": "Set up dashboards and advanced tracking",
+      "tasks": [
+        {
+          "id": "6.1",
+          "task": "Create PostHog dashboards",
+          "dashboards": [
+            "User Journey Funnel",
+            "Performance Metrics",
+            "Feature Usage",
+            "Error Tracking",
+            "Style Popularity"
+          ]
+        },
+        {
+          "id": "6.2",
+          "task": "Set up alerts",
+          "alerts": [
+            "High error rate",
+            "Performance degradation",
+            "Unusual traffic spike",
+            "Low conversion rate"
+          ]
+        },
+        {
+          "id": "6.3",
+          "task": "Implement A/B testing",
+          "tests": [
+            "3 vs 6 style generation",
+            "Lead capture timing",
+            "PWA prompt timing",
+            "Custom prompt visibility"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_notes": {
+    "privacy_considerations": [
+      "Add analytics consent banner",
+      "Implement opt-out mechanism",
+      "No PII in event properties",
+      "Respect Do Not Track"
+    ],
+    "performance_impact": [
+      "Use async loading for PostHog script",
+      "Batch events when possible",
+      "Debounce rapid fire events",
+      "Use sampling for high-volume events"
+    ],
+    "testing_strategy": [
+      "Create analytics debug mode",
+      "Test events in PostHog debug panel",
+      "Verify no sensitive data leakage",
+      "Performance impact testing"
+    ]
+  },
+  "estimated_effort": {
+    "phase_1": "2-3 hours",
+    "phase_2": "3-4 hours",
+    "phase_3": "2-3 hours",
+    "phase_4": "2 hours",
+    "phase_5": "3-4 hours",
+    "phase_6": "2-3 hours",
+    "total": "14-22 hours"
+  },
+  "priority_order": [
+    "Phase 1 & 2 are critical (core tracking)",
+    "Phase 3 for performance insights",
+    "Phase 4 for user segmentation",
+    "Phase 5 for business growth",
+    "Phase 6 for optimization"
+  ]
+}

@@ -17,6 +17,8 @@ declare global {
       downlink: number;
       rtt: number;
       saveData: boolean;
+      addEventListener?: (event: string, handler: () => void) => void;
+      removeEventListener?: (event: string, handler: () => void) => void;
     };
   }
 }
@@ -69,7 +71,7 @@ export const useNetworkStatus = (): NetworkInfo => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     
-    if (navigator.connection) {
+    if (navigator.connection && navigator.connection.addEventListener) {
       navigator.connection.addEventListener('change', handleConnectionChange);
     }
 
@@ -77,7 +79,7 @@ export const useNetworkStatus = (): NetworkInfo => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       
-      if (navigator.connection) {
+      if (navigator.connection && navigator.connection.removeEventListener) {
         navigator.connection.removeEventListener('change', handleConnectionChange);
       }
     };

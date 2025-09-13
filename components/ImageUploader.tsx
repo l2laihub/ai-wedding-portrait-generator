@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import Icon from './Icon';
 import { useViewport } from '../hooks/useViewport';
+import { posthogService } from '../services/posthogService';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File) => void;
@@ -30,12 +31,26 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
     return null;
   }, []);
 
-  const processFile = useCallback(async (file: File) => {
+  const processFile = useCallback(async (file: File, uploadMethod: 'drag' | 'click') => {
     setIsProcessing(true);
+    
+    // Track upload started
+    posthogService.trackImageUpload('started', {
+      fileSize: file.size,
+      fileType: file.type,
+      uploadMethod,
+    });
     
     try {
       const error = validateFile(file);
       if (error) {
+        // Track upload failed due to validation
+        posthogService.trackImageUpload('failed', {
+          fileSize: file.size,
+          fileType: file.type,
+          uploadMethod,
+          error: error,
+        });
         alert(error);
         return;
       }
@@ -46,7 +61,21 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
       }
 
       onImageUpload(file);
+      
+      // Track successful upload
+      posthogService.trackImageUpload('completed', {
+        fileSize: file.size,
+        fileType: file.type,
+        uploadMethod,
+      });
     } catch (err) {
+      // Track upload failed due to error
+      posthogService.trackImageUpload('failed', {
+        fileSize: file.size,
+        fileType: file.type,
+        uploadMethod,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
       alert('Error processing file. Please try again.');
       console.error('File processing error:', err);
     } finally {
@@ -56,7 +85,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+      processFile(e.target.files[0], 'click');
     }
   }, [processFile]);
 
@@ -66,7 +95,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, sourceImag
     setIsDragging(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
+      processFile(e.dataTransfer.files[0], 'drag');
     }
   }, [processFile]);
 

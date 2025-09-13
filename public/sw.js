@@ -1,14 +1,20 @@
 // Service Worker for AI Wedding Portrait Generator
-const CACHE_NAME = 'wedding-ai-v1';
-const STATIC_CACHE = 'wedding-ai-static-v1';
-const DYNAMIC_CACHE = 'wedding-ai-dynamic-v1';
+const CACHE_NAME = 'wedding-ai-v2';
+const STATIC_CACHE = 'wedding-ai-static-v2';
 
-// Assets to cache immediately
+// Only cache assets that actually exist
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  // Add critical CSS/JS files here when available
+  '/assets/wedai_logo_notext_nobg.png',
+  // Only cache existing icons
+  '/icons/icon-32x32.png',
+  '/icons/icon-152x152.png',
+  '/icons/icon-180x180.png',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/icons/social-preview.png'
 ];
 
 // Runtime caching patterns
@@ -81,7 +87,10 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    handleFetch(request, url)
+    handleFetch(request, url).catch(() => {
+      // Return a simple network fallback for any errors
+      return fetch(request);
+    })
   );
 });
 
@@ -131,17 +140,28 @@ async function handleFetch(request, url) {
 
 // Cache First Strategy
 async function cacheFirst(request, cacheName) {
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
+  try {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, networkResponse.clone());
+      return networkResponse;
+    }
+    
+    // Return the response even if not ok (let browser handle 404, etc.)
+    return networkResponse;
+  } catch (error) {
+    // If everything fails, return a basic error response
+    return new Response('Asset not found', {
+      status: 404,
+      statusText: 'Not Found'
+    });
   }
-  
-  const networkResponse = await fetch(request);
-  if (networkResponse.ok) {
-    const cache = await caches.open(cacheName);
-    cache.put(request, networkResponse.clone());
-  }
-  return networkResponse;
 }
 
 // Network First Strategy with timeout

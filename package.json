@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
+    "posthog-js": "^1.265.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
