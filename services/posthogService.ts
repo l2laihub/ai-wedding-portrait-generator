@@ -41,6 +41,14 @@ export enum EventName {
   
   // Counter tracking
   GENERATION_COUNTER_INCREMENTED = 'generation_counter_incremented',
+  
+  // PWA events
+  PWA_INSTALL_PROMPT_SHOWN = 'pwa_install_prompt_shown',
+  PWA_INSTALL_PROMPT_ACCEPTED = 'pwa_install_prompt_accepted',
+  PWA_INSTALL_PROMPT_DISMISSED = 'pwa_install_prompt_dismissed',
+  PWA_INSTALLED = 'pwa_installed',
+  PWA_MANUAL_INSTALL_ATTEMPT = 'pwa_manual_install_attempt',
+  PWA_BANNER_DISMISSED = 'pwa_banner_dismissed',
 }
 
 // Event properties interfaces

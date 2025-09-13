@@ -1,6 +1,7 @@
 import React from 'react';
 import Icon from './Icon';
 import ThemeToggle from './ThemeToggle';
+import PWAInstallButton from './PWAInstallButton';
 import { useGenerationCounter } from '../hooks/useGenerationCounter';
 
 const SimpleHeader: React.FC = () => {
@@ -30,8 +31,8 @@ const SimpleHeader: React.FC = () => {
             </div>
           </div>
 
-          {/* Theme Toggle - Right (temporarily hidden) */}
-          {/* <ThemeToggle /> */}
+          {/* Install Button - Right */}
+          <PWAInstallButton variant="badge" size="sm" />
         </div>
       </div>
 
