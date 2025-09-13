@@ -5,6 +5,7 @@ import Loader from './Loader';
 const LazyImageUploader = lazy(() => import('./ImageUploader'));
 const LazyImageDisplay = lazy(() => import('./ImageDisplay'));
 const LazyPromptInput = lazy(() => import('./PromptInput'));
+const LazyPhotoTypeSelector = lazy(() => import('./PhotoTypeSelector'));
 
 // Fallback component for loading states
 const ComponentLoader: React.FC<{ message?: string }> = ({ message = "Loading..." }) => (
@@ -37,6 +38,12 @@ export const SuspensePromptInput: React.FC<React.ComponentProps<typeof LazyPromp
   </Suspense>
 );
 
+export const SuspensePhotoTypeSelector: React.FC<React.ComponentProps<typeof LazyPhotoTypeSelector>> = (props) => (
+  <Suspense fallback={<ComponentLoader message="Loading photo type selector..." />}>
+    <LazyPhotoTypeSelector {...props} />
+  </Suspense>
+);
+
 // Preloader for critical components on mobile
 export const preloadCriticalComponents = () => {
   if (typeof window !== 'undefined' && 'ontouchstart' in window) {
@@ -55,5 +62,6 @@ export default {
   SuspenseImageUploader,
   SuspenseImageDisplay,
   SuspensePromptInput,
+  SuspensePhotoTypeSelector,
   preloadCriticalComponents
 };

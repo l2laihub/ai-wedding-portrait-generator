@@ -5,6 +5,7 @@ import { useViewport } from '../hooks/useViewport';
 import { useLazyImage } from '../hooks/useIntersectionObserver';
 import { useTouch } from '../hooks/useTouch';
 import { posthogService } from '../services/posthogService';
+import ImagePreviewModal from './ImagePreviewModal';
 
 interface ImageDisplayProps {
   contents: GeneratedContent[];
@@ -118,6 +119,7 @@ const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; g
   const { isMobile } = useViewport();
   const [showActions, setShowActions] = useState(false);
   const [hasBeenViewed, setHasBeenViewed] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const handleDownloadClick = useCallback(() => {
     if (imageUrl) {
@@ -206,6 +208,31 @@ const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; g
               }}
             >
               <div className="flex gap-3 items-center">
+                {/* Preview Button */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Preview button clicked', { imageUrl, style });
+                    setShowPreview(true);
+                    if (isMobile) setShowActions(false);
+                  }}
+                  className={`
+                    flex items-center gap-2 bg-blue-600 text-white font-bold rounded-full 
+                    hover:bg-blue-700 transition-all duration-200
+                    ${isMobile ? 'py-3 px-4 text-sm' : 'py-2 px-4 text-sm'}
+                    ${isMobile ? 'active:scale-95' : 'hover:scale-105'}
+                  `}
+                  title="Preview full size"
+                  type="button"
+                >
+                  <Icon 
+                    path="M12 4.5C7 4.5 4.73 7.61 3.82 12 4.73 16.39 7 19.5 12 19.5c4.99 0 7.27-3.11 8.18-7.5C19.27 7.61 17 4.5 12 4.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                    className="w-5 h-5" 
+                  />
+                  {isMobile ? '' : 'Preview'}
+                </button>
+
                 {/* Download Button */}
                 <button
                   onClick={(e) => {
@@ -279,6 +306,19 @@ const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; g
           {`"${text.length > 100 ? text.substring(0, 100) + '...' : text}"`}
         </p>
       )}
+      
+      {/* Preview Modal */}
+      {imageUrl && (
+        <ImagePreviewModal
+          imageUrl={imageUrl}
+          title={`${style} Wedding Portrait`}
+          isOpen={showPreview}
+          onClose={() => {
+            console.log('Closing preview modal');
+            setShowPreview(false);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -299,7 +339,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId }) =
 
   return (
     <div className={`mt-10 w-full mx-auto ${isMobile ? 'px-2' : 'max-w-7xl'}`}>
-      <h2 className={`font-bold text-center text-white mb-6 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
+      <h2 className={`font-bold text-center text-black mb-6 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
         Your Wedding Portraits
       </h2>
       

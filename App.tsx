@@ -9,6 +9,7 @@ import {
   SuspenseImageUploader, 
   SuspenseImageDisplay, 
   SuspensePromptInput,
+  SuspensePhotoTypeSelector,
   preloadCriticalComponents
 } from './components/LazyComponents';
 import { editImageWithNanoBanana } from './services/geminiService';
@@ -24,13 +25,60 @@ const ALL_WEDDING_STYLES = [
   "Bohemian Beach Wedding",
   "Vintage Victorian Wedding",
   "Modern Minimalist Wedding",
-  "Fairytale Castle Wedding"
+  "Fairytale Castle Wedding",
+  "Enchanted Forest Wedding",
+  "Gatsby Art Deco Wedding",
+  "Tropical Paradise Wedding",
+  "Winter Wonderland Wedding",
+  "Gothic Romance Wedding",
+  "Starry Night Galaxy Wedding",
+  "Japanese Cherry Blossom Wedding",
+  "Mediterranean Villa Wedding",
+  "Steampunk Victorian Wedding",
+  "Disco 70s Glam Wedding",
+  "Hollywood Red Carpet Wedding",
+  "Underwater Mermaid Wedding",
+  "Desert Oasis Wedding",
+  "Harry Potter Wizarding Wedding"
 ];
 
 // Function to get 3 random wedding styles for each generation
 const getRandomWeddingStyles = () => {
   const shuffled = [...ALL_WEDDING_STYLES].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, 3);
+};
+
+// Convert number to word for better AI understanding
+const numberToWord = (num: number): string => {
+  const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  return words[num] || num.toString();
+};
+
+// Get style-specific pose suggestions for single portraits
+const getStylePose = (style: string): string => {
+  const stylePoses: { [key: string]: string } = {
+    "Classic & Timeless Wedding": "elegant standing pose with bouquet, three-quarter turn showing the dress train",
+    "Rustic Barn Wedding": "leaning against barn door, relaxed pose with boots visible, natural smile",
+    "Bohemian Beach Wedding": "walking barefoot on beach, flowing dress in the wind, carefree pose",
+    "Vintage Victorian Wedding": "sitting on vintage chair, hands folded, regal posture with full gown visible",
+    "Modern Minimalist Wedding": "confident power pose, clean lines, architectural background, full silhouette",
+    "Fairytale Castle Wedding": "twirling in ballgown, dramatic staircase pose, princess-like stance",
+    "Enchanted Forest Wedding": "mystical pose among trees, flower crown, ethereal stance with natural lighting",
+    "Gatsby Art Deco Wedding": "glamorous 1920s pose, jazz hands, flapper dress with pearls, champagne glass",
+    "Tropical Paradise Wedding": "playful pose with tropical flowers, vibrant colors, beach resort background",
+    // "Winter Wonderland Wedding": "elegant pose in faux fur wrap, snowy backdrop, ice queen stance",
+    // "Gothic Romance Wedding": "dramatic pose with dark elegance, cathedral background, mysterious allure",
+    // "Starry Night Galaxy Wedding": "dreamy pose under stars, cosmic dress effects, celestial goddess stance",
+    // "Japanese Cherry Blossom Wedding": "graceful pose under sakura trees, traditional elements, serene expression",
+    // "Mediterranean Villa Wedding": "romantic pose on terrace, flowing dress, sunset golden hour lighting",
+    // "Steampunk Victorian Wedding": "adventurous pose with gears and goggles, corset dress, vintage machinery",
+    // "Disco 70s Glam Wedding": "dancing pose with platform shoes, bell sleeves, groovy peace sign gesture",
+     "Hollywood Red Carpet Wedding": "glamorous pose with paparazzi lights, movie star entrance, dramatic train",
+    // "Underwater Mermaid Wedding": "flowing underwater pose, ethereal fabric movement, aquatic fantasy stance",
+    // "Desert Oasis Wedding": "dramatic pose with flowing fabric, sunset silhouette, bohemian desert queen",
+    // "Harry Potter Wizarding Wedding": "magical pose with wand, floating veil effect, Hogwarts castle background"
+  };
+  return stylePoses[style] || "elegant full body pose";
 };
 
 interface AppProps {
@@ -45,6 +93,8 @@ function App({ navigate }: AppProps) {
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
+  const [photoType, setPhotoType] = useState<'single' | 'couple' | 'family'>('couple');
+  const [familyMemberCount, setFamilyMemberCount] = useState<number>(4);
   
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
@@ -121,6 +171,8 @@ function App({ navigate }: AppProps) {
         customPrompt: customPrompt || undefined,
         generationId,
         timestamp: Date.now(),
+        photoType,
+        familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
       });
       
       // Adjust generation strategy for slow connections or feature flag
@@ -129,10 +181,14 @@ function App({ navigate }: AppProps) {
       if (generateSequentially) {
         // Generate one at a time to reduce network load
         const finalContents: GeneratedContent[] = [];
-        
         for (let i = 0; i < stylesToGenerate.length; i++) {
           const style = stylesToGenerate[i];
-          const prompt = `Transform the couple in the image into a beautiful wedding portrait with a "${style}" theme. ${customPrompt}. Make them look like they are dressed for a wedding in that style.`;
+          // image prompts are long, so we track each style generation separately
+          const prompt = photoType === 'single'
+            ? `Transform the person into a FULL BODY wedding portrait with a "${style}" theme. Create a professional bridal/groom portrait showing them in ${getStylePose(style)}. Keep their face EXACTLY identical to the original - preserve ALL facial features, expressions, and complete likeness. Show the complete wedding outfit from head to toe, including dress/suit details, shoes, and accessories. The subject should be in a flattering, professional modeling pose appropriate for the wedding style. ${customPrompt}. Ensure their face remains perfectly consistent and unchanged from the original photo while creating a stunning full-length portrait.`
+            : photoType === 'couple' 
+            ? `Transform the couple in the image into a beautiful wedding portrait with a "${style}" theme. Keep their faces EXACTLY identical to the original - preserve their facial features, expressions, and likeness completely. Maintain the subjects' identity while transforming only their clothing and background to match the wedding style. ${customPrompt}. Make them look like they are dressed for a wedding in that style, but ensure their faces remain perfectly consistent and unchanged from the original photo.`
+            : `${numberToWord(familyMemberCount)} people family photo: Transform this family into a beautiful wedding portrait with a "${style}" theme. Crucially, preserve the exact likeness of EACH and EVERY family member's face and unique facial features. Only transform their clothing and the environment. Ensure all ${numberToWord(familyMemberCount)} individuals from the original photo are present and their identity is clearly recognizable. ${customPrompt}`;
           
           try {
             const styleStartTime = Date.now();
@@ -180,7 +236,11 @@ function App({ navigate }: AppProps) {
         // Generate all styles concurrently (original behavior)
         const generationPromises = stylesToGenerate.map(style => {
           const styleStartTime = Date.now();
-          const prompt = `Transform the couple in the image into a beautiful wedding portrait with a "${style}" theme. ${customPrompt}. Make them look like they are dressed for a wedding in that style.`;
+          const prompt = photoType === 'single'
+            ? `Transform the person into a FULL BODY wedding portrait with a "${style}" theme. Create a professional bridal/groom portrait showing them in ${getStylePose(style)}. Keep their face EXACTLY identical to the original - preserve ALL facial features, expressions, and complete likeness. Show the complete wedding outfit from head to toe, including dress/suit details, shoes, and accessories. The subject should be in a flattering, professional modeling pose appropriate for the wedding style. ${customPrompt}. Ensure their face remains perfectly consistent and unchanged from the original photo while creating a stunning full-length portrait.`
+            : photoType === 'couple' 
+            ? `Transform the couple in the image into a beautiful wedding portrait with a "${style}" theme. Keep their faces EXACTLY identical to the original - preserve their facial features, expressions, and likeness completely. Maintain the subjects' identity while transforming only their clothing and background to match the wedding style. ${customPrompt}. Make them look like they are dressed for a wedding in that style, but ensure their faces remain perfectly consistent and unchanged from the original photo.`
+            : `${numberToWord(familyMemberCount)} people family photo: Transform this family into a beautiful wedding portrait with a "${style}" theme. Crucially, preserve the exact likeness of EACH and EVERY family member's face and unique facial features. Only transform their clothing and the environment. Ensure all ${numberToWord(familyMemberCount)} individuals from the original photo are present and their identity is clearly recognizable. ${customPrompt}`;
           
           return editImageWithNanoBanana(sourceImageFile, prompt)
             .then(content => {
@@ -274,6 +334,13 @@ function App({ navigate }: AppProps) {
       
       <main className={getMainClasses()}>
         <div className={isMobile ? "space-y-4" : "space-y-8"}>
+          <SuspensePhotoTypeSelector
+            photoType={photoType}
+            onPhotoTypeChange={setPhotoType}
+            familyMemberCount={familyMemberCount}
+            onFamilyMemberCountChange={setFamilyMemberCount}
+          />
+          
           <SuspenseImageUploader 
             onImageUpload={handleImageUpload} 
             sourceImageUrl={sourceImageUrl} 
@@ -293,7 +360,7 @@ function App({ navigate }: AppProps) {
               message={
                 isSlowConnection && isMobile 
                   ? "Creating portraits one by one for better performance..." 
-                  : "Our AI is crafting 3 unique wedding portraits from 6 amazing styles..."
+                  : "Our AI is crafting 3 unique wedding portraits from 10 amazing styles..."
               } 
             />
           )}
@@ -335,7 +402,7 @@ function App({ navigate }: AppProps) {
                     <span className="text-2xl">✨</span>
                   </div>
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-lg transition-colors duration-300">2. AI Magic</h4>
-                  <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Our AI generates 3 unique wedding portraits from 6+ beautiful styles</p>
+                  <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Our AI generates 3 unique wedding portraits from 10 beautiful styles</p>
                 </div>
                 <div className="text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -343,6 +410,23 @@ function App({ navigate }: AppProps) {
                   </div>
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-lg transition-colors duration-300">3. Download & Share</h4>
                   <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Save your magical portraits and share them with loved ones</p>
+                </div>
+              </div>
+              
+              {/* Theme Examples */}
+              <div className="mt-8 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
+                <h4 className="font-semibold text-center text-gray-900 dark:text-white mb-4 transition-colors duration-300">10 Amazing Wedding Themes</h4>
+                <div className="flex flex-wrap justify-center gap-2 text-sm">
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Classic & Timeless</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Rustic Barn</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Bohemian Beach</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Vintage Victorian</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Modern Minimalist</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Fairytale Castle</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Enchanted Forest</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Gatsby Art Deco</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Tropical Paradise</span>
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Hollywood Red Carpet</span>
                 </div>
               </div>
             </div>

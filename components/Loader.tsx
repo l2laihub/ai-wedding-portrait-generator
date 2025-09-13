@@ -78,7 +78,7 @@ const Loader: React.FC<LoaderProps> = ({ message = "Conjuring pixels..." }) => {
       </div>
 
       {/* Main Loading Message */}
-      <p className={`mt-4 ${getMessageSize()} font-medium text-white`}>
+      <p className={`mt-4 ${getMessageSize()} font-medium text-black dark:text-white`}>
         {currentMessage}
       </p>
       
