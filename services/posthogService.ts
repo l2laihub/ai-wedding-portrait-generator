@@ -86,6 +86,21 @@ export interface UserIdentificationProperties {
   timezone?: string;
 }
 
+export interface CounterIncrementProperties {
+  generationId: string;
+  totalGenerations: number;
+  dailyGenerations: number;
+  successfulStyles: number;
+  totalStyles: number;
+  successRate: number;
+  photoType: 'single' | 'couple' | 'family';
+  familyMemberCount?: number;
+  customPrompt?: string;
+  generationDuration?: number;
+  styles?: string[];
+  timestamp: number;
+}
+
 class PostHogService {
   private static instance: PostHogService;
   private initialized = false;
@@ -383,6 +398,95 @@ class PostHogService {
     }
 
     posthog.opt_in_capturing();
+  }
+
+  /**
+   * Track counter increment with comprehensive metadata
+   */
+  trackCounterIncrement(properties: CounterIncrementProperties): void {
+    if (!this.initialized) {
+      return; // Silently ignore if not initialized
+    }
+
+    try {
+      this.track(EventName.GENERATION_COUNTER_INCREMENTED, {
+        ...properties,
+        timestamp: Date.now(),
+        // Add derived metrics for better analytics
+        averageSuccessRate: properties.successRate,
+        isFullySuccessful: properties.successfulStyles === properties.totalStyles,
+        hasCustomPrompt: !!properties.customPrompt,
+        customPromptLength: properties.customPrompt?.length || 0,
+        // Add user context
+        userAgent: navigator.userAgent,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height,
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+    } catch (error) {
+      console.warn('PostHog counter tracking error (continuing silently):', error);
+    }
+  }
+
+  /**
+   * Track counter milestone achievements
+   */
+  trackCounterMilestone(milestone: number, totalGenerations: number): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    try {
+      this.track('counter_milestone_reached', {
+        milestone,
+        totalGenerations,
+        achievedAt: Date.now(),
+        userAgent: navigator.userAgent,
+      });
+    } catch (error) {
+      console.warn('PostHog milestone tracking error (continuing silently):', error);
+    }
+  }
+
+  /**
+   * Track user engagement patterns
+   */
+  trackUserEngagementMetrics(metrics: {
+    sessionDuration: number;
+    generationsInSession: number;
+    timeToFirstGeneration: number;
+    averageTimeBetweenGenerations?: number;
+  }): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    try {
+      this.track('user_engagement_metrics', {
+        ...metrics,
+        timestamp: Date.now(),
+        engagementScore: this.calculateEngagementScore(metrics),
+      });
+    } catch (error) {
+      console.warn('PostHog engagement tracking error (continuing silently):', error);
+    }
+  }
+
+  /**
+   * Calculate engagement score based on user behavior
+   */
+  private calculateEngagementScore(metrics: {
+    sessionDuration: number;
+    generationsInSession: number;
+    timeToFirstGeneration: number;
+  }): number {
+    // Simple engagement scoring algorithm
+    const durationScore = Math.min(metrics.sessionDuration / (5 * 60 * 1000), 1); // Max 5 minutes
+    const generationScore = Math.min(metrics.generationsInSession / 5, 1); // Max 5 generations
+    const speedScore = Math.max(0, 1 - (metrics.timeToFirstGeneration / (2 * 60 * 1000))); // Faster is better, max 2 minutes
+    
+    return (durationScore * 0.4 + generationScore * 0.4 + speedScore * 0.2) * 100;
   }
 
   /**

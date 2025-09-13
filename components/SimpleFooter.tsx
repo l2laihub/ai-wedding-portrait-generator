@@ -1,5 +1,6 @@
 import React from 'react';
 import Icon from './Icon';
+import { useGenerationCounter } from '../hooks/useGenerationCounter';
 
 interface SimpleFooterProps {
   navigate?: (route: 'home' | 'privacy' | 'terms') => void;
@@ -7,6 +8,7 @@ interface SimpleFooterProps {
 
 const SimpleFooter: React.FC<SimpleFooterProps> = ({ navigate }) => {
   const currentYear = new Date().getFullYear();
+  const { totalGenerations, dailyGenerations } = useGenerationCounter();
 
   return (
     <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 mt-auto transition-colors duration-300">
@@ -46,6 +48,27 @@ const SimpleFooter: React.FC<SimpleFooterProps> = ({ navigate }) => {
             <div className="flex items-center gap-2">
               <Icon path="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" className="w-4 h-4 text-teal-500 dark:text-teal-400" />
               <span>Your Privacy Matters</span>
+            </div>
+          </div>
+
+          {/* Generation Counter - Clean Stats */}
+          <div className="flex items-center justify-center gap-8 mb-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-300">
+                {totalGenerations.toLocaleString()}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 transition-colors duration-300">
+                Total Portraits
+              </div>
+            </div>
+            <div className="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 transition-colors duration-300">
+                {dailyGenerations}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 transition-colors duration-300">
+                Today's Portraits
+              </div>
             </div>
           </div>
 

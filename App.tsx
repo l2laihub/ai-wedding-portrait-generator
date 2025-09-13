@@ -143,6 +143,34 @@ function App({ navigate }: AppProps) {
     }
   };
 
+  // Helper method to increment counter with enhanced metadata
+  const incrementCounterWithMetadata = (
+    generationId: string,
+    successfulStyles: number,
+    totalStyles: number,
+    photoType: 'single' | 'couple' | 'family',
+    styles: string[],
+    customPrompt: string
+  ) => {
+    // First increment the counter normally
+    counterService.incrementCounter(generationId, successfulStyles, totalStyles, photoType);
+    
+    // Then enhance with additional PostHog metadata
+    posthogService.trackCounterIncrement({
+      generationId,
+      totalGenerations: counterService.getTotalGenerations(),
+      dailyGenerations: counterService.getDailyGenerations(),
+      successfulStyles,
+      totalStyles,
+      successRate: totalStyles > 0 ? successfulStyles / totalStyles : 0,
+      photoType,
+      familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
+      customPrompt: customPrompt.trim() || undefined,
+      styles,
+      timestamp: Date.now(),
+    });
+  };
+
   const handleGenerate = async () => {
     if (!sourceImageFile) {
       setError("Please upload an image first.");
@@ -234,12 +262,14 @@ function App({ navigate }: AppProps) {
         const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
         posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
         
-        // Increment counter for successful generation
-        counterService.incrementCounter(
-          generationId, 
-          successfulStyles.length, 
+        // Increment counter for successful generation with enhanced metadata
+        incrementCounterWithMetadata(
+          generationId,
+          successfulStyles.length,
           stylesToGenerate.length,
-          photoType
+          photoType,
+          stylesToGenerate,
+          customPrompt
         );
       } else {
         // Generate all styles concurrently (original behavior)
@@ -307,12 +337,14 @@ function App({ navigate }: AppProps) {
           .map((_, index) => stylesToGenerate[index]);
         posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
         
-        // Increment counter for successful generation
-        counterService.incrementCounter(
-          generationId, 
-          successfulStyles.length, 
+        // Increment counter for successful generation with enhanced metadata
+        incrementCounterWithMetadata(
+          generationId,
+          successfulStyles.length,
           stylesToGenerate.length,
-          photoType
+          photoType,
+          stylesToGenerate,
+          customPrompt
         );
 
         if (results.some(r => r.status === 'rejected')) {

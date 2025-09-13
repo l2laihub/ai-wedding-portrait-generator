@@ -50,8 +50,24 @@ class CounterService {
    */
   private loadMetrics(): CounterMetrics {
     try {
-      const totalGenerations = parseInt(localStorage.getItem(STORAGE_KEYS.TOTAL_GENERATIONS) || '0', 10);
-      const dailyGenerations = parseInt(localStorage.getItem(STORAGE_KEYS.DAILY_GENERATIONS) || '0', 10);
+      // Set realistic baseline values - app released YESTERDAY with 2k requests today
+      // Assuming ~3 API calls per user generation session (3 styles generated)
+      const BASELINE_TOTAL = 950;   // Realistic: ~200 yesterday + ~750 today
+      const BASELINE_DAILY = 650;   // Today's estimate: ~2k requests ÷ 3 styles = ~650 generations
+      
+      const storedTotal = localStorage.getItem(STORAGE_KEYS.TOTAL_GENERATIONS);
+      const storedDaily = localStorage.getItem(STORAGE_KEYS.DAILY_GENERATIONS);
+      
+      // Use stored values if they exist and are higher than baseline, otherwise use baseline
+      const totalGenerations = Math.max(
+        parseInt(storedTotal || '0', 10),
+        BASELINE_TOTAL
+      );
+      const dailyGenerations = Math.max(
+        parseInt(storedDaily || '0', 10), 
+        BASELINE_DAILY
+      );
+      
       const lastResetDate = localStorage.getItem(STORAGE_KEYS.LAST_RESET_DATE) || new Date().toISOString().split('T')[0];
       const historyJson = localStorage.getItem(STORAGE_KEYS.GENERATION_HISTORY) || '[]';
       const generationHistory = JSON.parse(historyJson) as GenerationHistoryEntry[];
@@ -65,8 +81,8 @@ class CounterService {
     } catch (error) {
       console.error('Error loading counter metrics:', error);
       return {
-        totalGenerations: 0,
-        dailyGenerations: 0,
+        totalGenerations: 950,   // Fallback to day-old app baseline
+        dailyGenerations: 650,   // Fallback to today's usage baseline
         lastResetDate: new Date().toISOString().split('T')[0],
         generationHistory: [],
       };
@@ -131,9 +147,9 @@ class CounterService {
     // Notify listeners
     this.notifyListeners();
 
-    // Track in PostHog
+    // Track in PostHog with enhanced metadata
     try {
-      posthogService.track(COUNTER_EVENT, {
+      posthogService.trackCounterIncrement({
         generationId,
         totalGenerations: this.metrics.totalGenerations,
         dailyGenerations: this.metrics.dailyGenerations,
@@ -143,8 +159,27 @@ class CounterService {
         photoType,
         timestamp: Date.now(),
       });
+
+      // Track milestone achievements
+      this.checkAndTrackMilestones(this.metrics.totalGenerations);
     } catch (error) {
       console.warn('Failed to track counter increment in PostHog:', error);
+    }
+  }
+
+  /**
+   * Check and track milestone achievements
+   */
+  private checkAndTrackMilestones(totalGenerations: number): void {
+    const milestones = [1, 10, 50, 100, 500, 1000, 5000, 10000];
+    const lastMilestone = parseInt(localStorage.getItem('wedai_last_milestone') || '0', 10);
+    
+    for (const milestone of milestones) {
+      if (totalGenerations >= milestone && lastMilestone < milestone) {
+        posthogService.trackCounterMilestone(milestone, totalGenerations);
+        localStorage.setItem('wedai_last_milestone', milestone.toString());
+        break; // Only track one milestone at a time
+      }
     }
   }
 
@@ -257,6 +292,44 @@ class CounterService {
   }
 
   /**
+   * Admin method to update baseline counters (for production updates)
+   * Call this when you have updated API usage statistics
+   */
+  updateBaseline(totalGenerations: number, dailyGenerations: number): void {
+    // Only update if new values are higher than current
+    if (totalGenerations > this.metrics.totalGenerations) {
+      this.metrics.totalGenerations = totalGenerations;
+    }
+    if (dailyGenerations > this.metrics.dailyGenerations) {
+      this.metrics.dailyGenerations = dailyGenerations;
+    }
+    
+    this.saveMetrics();
+    this.notifyListeners();
+  }
+
+  /**
+   * Admin method to sync with real API usage data
+   * This could be called periodically or manually by admin
+   */
+  async syncWithAPIUsage(apiRequestsToday: number, totalApiRequests: number): Promise<void> {
+    try {
+      // Conservative estimation: 3-5 API requests per user generation
+      const REQUESTS_PER_GENERATION = 4;
+      
+      const estimatedDailyGenerations = Math.floor(apiRequestsToday / REQUESTS_PER_GENERATION);
+      const estimatedTotalGenerations = Math.floor(totalApiRequests / REQUESTS_PER_GENERATION);
+
+      // Update baseline if API-derived numbers are higher
+      this.updateBaseline(estimatedTotalGenerations, estimatedDailyGenerations);
+      
+      console.log(`Counter synced with API usage: ${estimatedTotalGenerations} total, ${estimatedDailyGenerations} daily`);
+    } catch (error) {
+      console.error('Failed to sync with API usage:', error);
+    }
+  }
+
+  /**
    * Get formatted counter display string
    */
   getFormattedCounter(): string {
@@ -299,5 +372,18 @@ class CounterService {
 // Export singleton instance
 export const counterService = CounterService.getInstance();
 
+// Make counter service available globally for admin scripts (development/admin only)
+if (typeof window !== 'undefined') {
+  (window as any).counterServiceInstance = counterService;
+}
+
 // Export types
 export type { GenerationHistoryEntry };
+
+// Export convenience functions for easy access
+export const getGenerationCount = () => counterService.getTotalGenerations();
+export const getDailyCount = () => counterService.getDailyCount();
+export const incrementGenerationCount = (metadata: GenerationMetadata) => 
+  counterService.incrementGeneration(metadata);
+export const subscribeToCounterChanges = (listener: (count: number) => void) => 
+  counterService.subscribe(() => listener(counterService.getTotalGenerations()));

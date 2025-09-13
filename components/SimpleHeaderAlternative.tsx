@@ -1,9 +1,15 @@
 import React from 'react';
 import Icon from './Icon';
 import ThemeToggle from './ThemeToggle';
+import TodayCounter from './TodayCounter';
 import { useGenerationCounter } from '../hooks/useGenerationCounter';
 
-const SimpleHeader: React.FC = () => {
+/**
+ * Alternative header layout with prominent counter display
+ * This is an example of how to display the counter more prominently
+ * You can replace SimpleHeader.tsx with this if you prefer this layout
+ */
+const SimpleHeaderAlternative: React.FC = () => {
   const { totalGenerations, dailyGenerations } = useGenerationCounter();
   
   return (
@@ -30,8 +36,8 @@ const SimpleHeader: React.FC = () => {
             </div>
           </div>
 
-          {/* Theme Toggle - Right (temporarily hidden) */}
-          {/* <ThemeToggle /> */}
+          {/* Counter - Right */}
+          <TodayCounter showTotal />
         </div>
       </div>
 
@@ -44,6 +50,25 @@ const SimpleHeader: React.FC = () => {
           <p className="text-sm md:text-xl text-gray-700 dark:text-gray-300 max-w-2xl mx-auto mb-4 md:mb-6 transition-colors duration-300">
             Transform your couple photos into magical wedding portraits with AI
           </p>
+
+          {/* Today's Counter - Prominent Display */}
+          <div className="flex justify-center mb-4 md:mb-6">
+            <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 dark:from-orange-400/20 dark:to-red-400/20 px-6 py-3 rounded-full border border-orange-300 dark:border-orange-700 shadow-lg">
+              <div className="flex items-center gap-3 text-orange-700 dark:text-orange-300">
+                <Icon 
+                  path="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" 
+                  className="w-6 h-6" 
+                />
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{dailyGenerations}</div>
+                  <div className="text-sm">Today's Portraits</div>
+                </div>
+                <div className="text-gray-400 dark:text-gray-500 text-sm">
+                  {totalGenerations.toLocaleString()} total
+                </div>
+              </div>
+            </div>
+          </div>
           
           <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 text-xs md:text-base">
             <div className="flex items-center gap-1 md:gap-2 text-gray-600 dark:text-gray-300 transition-colors duration-300">
@@ -65,4 +90,4 @@ const SimpleHeader: React.FC = () => {
   );
 };
 
-export default SimpleHeader;
+export default SimpleHeaderAlternative;
