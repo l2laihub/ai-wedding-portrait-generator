@@ -38,6 +38,9 @@ export enum EventName {
   // Lead tracking
   USER_IDENTIFIED = 'user_identified',
   EMAIL_PROVIDED = 'email_provided',
+  
+  // Counter tracking
+  GENERATION_COUNTER_INCREMENTED = 'generation_counter_incremented',
 }
 
 // Event properties interfaces
@@ -380,6 +383,30 @@ class PostHogService {
     }
 
     posthog.opt_in_capturing();
+  }
+
+  /**
+   * Get aggregated metrics (placeholder for future PostHog API integration)
+   * This would require server-side implementation or PostHog personal API key
+   */
+  async getAggregatedMetrics(): Promise<{
+    totalGenerations?: number;
+    uniqueUsers?: number;
+    averageGenerationsPerUser?: number;
+    message: string;
+  }> {
+    // This is a placeholder for future implementation
+    // Real implementation would require:
+    // 1. Server-side API with PostHog personal API key
+    // 2. Query PostHog's analytics API
+    // 3. Aggregate GENERATION_COMPLETED events
+    
+    return {
+      message: 'PostHog metrics API integration pending. Use counterService.getMetrics() for local data.',
+      totalGenerations: undefined,
+      uniqueUsers: undefined,
+      averageGenerationsPerUser: undefined,
+    };
   }
 }
 

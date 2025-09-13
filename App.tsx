@@ -17,6 +17,7 @@ import { GeneratedContent } from './types';
 import { useViewport } from './hooks/useViewport';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { posthogService } from './services/posthogService';
+import { counterService } from './services/counterService';
 // import { useAppFeatureFlags, FEATURE_FLAGS } from './hooks/useFeatureFlags';
 
 const ALL_WEDDING_STYLES = [
@@ -232,6 +233,14 @@ function App({ navigate }: AppProps) {
         const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
         const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
         posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
+        
+        // Increment counter for successful generation
+        counterService.incrementCounter(
+          generationId, 
+          successfulStyles.length, 
+          stylesToGenerate.length,
+          photoType
+        );
       } else {
         // Generate all styles concurrently (original behavior)
         const generationPromises = stylesToGenerate.map(style => {
@@ -297,6 +306,14 @@ function App({ navigate }: AppProps) {
           .filter((result, index) => result.status === 'rejected')
           .map((_, index) => stylesToGenerate[index]);
         posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
+        
+        // Increment counter for successful generation
+        counterService.incrementCounter(
+          generationId, 
+          successfulStyles.length, 
+          stylesToGenerate.length,
+          photoType
+        );
 
         if (results.some(r => r.status === 'rejected')) {
           setError("Some portrait styles could not be generated. Please check the console for details.");
