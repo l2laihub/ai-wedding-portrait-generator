@@ -56,11 +56,18 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
       }
     };
 
+    // Listen for counter update events for real-time synchronization
+    const handleCounterUpdate = () => {
+      updateUsageInfo();
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('counterUpdate', handleCounterUpdate);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('counterUpdate', handleCounterUpdate);
     };
   }, [showTimeUntilReset, user]);
 

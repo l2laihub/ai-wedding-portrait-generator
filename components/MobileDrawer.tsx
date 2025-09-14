@@ -253,37 +253,76 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, navigate }
   );
 };
 
-// Portrait Counter Component
+// Portrait Counter Component - using same logic as UsageCounter for consistency
 const PortraitCounter: React.FC<{ user: any }> = ({ user }) => {
   const [counterText, setCounterText] = useState('Loading...');
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   useEffect(() => {
     const updateCounter = async () => {
       try {
         if (user) {
-          // For authenticated users, get credits info
+          // For authenticated users, get credits info (same as UsageCounter)
           const balance = await creditsService.getBalance();
-          setCounterText(`Account • ${balance.balance} credits`);
+          if (balance.balance !== undefined) {
+            setCounterText(`Account • ${balance.balance} credits`);
+          } else {
+            setCounterText('Account • Loading credits...');
+          }
         } else {
-          // For anonymous users, use rate limiter
-          const stats = rateLimiter.getUsageStats();
-          setCounterText(`Free Account • ${stats.remaining} portraits left`);
+          // For anonymous users, use rate limiter (same as UsageCounter)
+          const limitInfo = rateLimiter.checkLimit();
+          setCounterText(`Free Account • ${limitInfo.remaining} portraits left`);
         }
+        setLastUpdate(Date.now());
       } catch (error) {
+        console.warn('PortraitCounter update failed:', error);
         if (user) {
-          setCounterText('Account • Error loading credits');
+          setCounterText('Account • Error loading');
         } else {
-          const stats = rateLimiter.getUsageStats();
-          setCounterText(`Free Account • ${stats.remaining} portraits left`);
+          // Fallback to safe rate limiter call
+          try {
+            const limitInfo = rateLimiter.checkLimit();
+            setCounterText(`Free Account • ${limitInfo.remaining} portraits left`);
+          } catch {
+            setCounterText('Free Account • 3 portraits left');
+          }
         }
       }
     };
 
     updateCounter();
     
-    // Update counter every 10 seconds
-    const interval = setInterval(updateCounter, 10000);
+    // Update counter every 30 seconds (same frequency as UsageCounter for consistency)
+    const interval = setInterval(updateCounter, 30000);
     return () => clearInterval(interval);
+  }, [user]);
+
+  // Listen for storage changes to sync with other counter updates
+  useEffect(() => {
+    const handleStorageChange = () => {
+      // Force update when localStorage changes (e.g., when generation happens)
+      if (!user) {
+        try {
+          const limitInfo = rateLimiter.checkLimit();
+          setCounterText(`Free Account • ${limitInfo.remaining} portraits left`);
+          setLastUpdate(Date.now());
+        } catch (error) {
+          console.warn('Counter sync failed:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Custom event for same-window updates
+    const handleCounterUpdate = () => handleStorageChange();
+    window.addEventListener('counterUpdate', handleCounterUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('counterUpdate', handleCounterUpdate);
+    };
   }, [user]);
 
   return (

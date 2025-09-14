@@ -142,6 +142,14 @@ class CreditsService {
 
       // Get updated balance
       const newBalance = await this.getBalance();
+      
+      // Emit custom event for counter synchronization
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { credits: newBalance.balance }
+        }));
+      }
+      
       return {
         success: true,
         newBalance

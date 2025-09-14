@@ -92,11 +92,17 @@ class RateLimiter {
   }
 
   /**
-   * Save usage data to localStorage
+   * Save usage data to localStorage and emit update event
    */
   private saveUsageData(data: UsageData): void {
     try {
       localStorage.setItem(this.config.SESSION_KEY, JSON.stringify(data));
+      // Emit custom event for counter synchronization
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: this.config.FREE_DAILY - data.used }
+        }));
+      }
     } catch (error) {
       console.warn('Failed to save usage data to localStorage:', error);
     }
