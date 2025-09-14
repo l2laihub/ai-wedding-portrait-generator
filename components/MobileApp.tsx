@@ -22,6 +22,7 @@ import LoginModal from './LoginModal';
 import UserProfile from './UserProfile';
 import LimitReachedModal from './LimitReachedModal';
 import ImagePreviewModal from './ImagePreviewModal';
+import MaintenanceBanner from './MaintenanceBanner';
 
 // Skeleton components
 import {
@@ -85,6 +86,9 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
   const { user, isAuthenticated, signOut } = useAuth();
+  
+  // Check maintenance mode
+  const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
   const { 
     toasts, 
     showSuccess, 
@@ -243,19 +247,13 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
     }
   };
 
-  // FAB actions
+  // Simplified FAB actions - only primary action
   const fabActions = sourceImageUrl ? [
     {
       id: 'generate',
       label: 'Generate Portraits',
       icon: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
-      onClick: () => setShowPromptSheet(true)
-    },
-    {
-      id: 'upload',
-      label: 'New Image',
-      icon: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z',
-      onClick: () => setShowUploadSheet(true)
+      onClick: handleGenerate // Direct generation without bottom sheet
     }
   ] : [
     {
@@ -298,6 +296,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
         onTabChange={handleTabChange}
         onRefresh={handleRefresh}
         headerTitle="Generating Portraits..."
+        navigate={navigate}
       >
         <div className="space-y-6 p-4">
           <PhotoTypeSelectorSkeleton />
@@ -312,12 +311,17 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
   }
 
   return (
-    <MobileAppShell
-      currentTab={currentTab}
-      onTabChange={handleTabChange}
-      onRefresh={handleRefresh}
-      headerTitle="WedAI"
-    >
+    <>
+      {/* Maintenance Mode - Must be first to overlay everything */}
+      <MaintenanceBanner variant="overlay" />
+      
+      <MobileAppShell
+        currentTab={currentTab}
+        onTabChange={handleTabChange}
+        onRefresh={handleRefresh}
+        headerTitle="WedAI"
+        navigate={navigate}
+      >
       <div className="space-y-6 p-4">
         {/* Photo Type Selector */}
         <SuspensePhotoTypeSelector
@@ -340,11 +344,11 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
           />
         )}
 
-        {/* Current Image Preview */}
+        {/* Current Image Preview with Generate Button */}
         {sourceImageUrl && !generatedContents && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4">
             <h3 className="font-semibold mb-3 text-center">Your Photo</h3>
-            <div className="relative">
+            <div className="relative mb-4">
               <img 
                 src={sourceImageUrl} 
                 alt="Uploaded" 
@@ -357,6 +361,16 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
                 ✏️
               </button>
             </div>
+            
+            {/* Direct Generate Button */}
+            <button
+              onClick={handleGenerate}
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <span className="text-xl">✨</span>
+              Generate Wedding Portraits
+            </button>
           </div>
         )}
 
@@ -387,7 +401,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
             <h3 className="text-xl font-bold text-center mb-6">How It Works</h3>
             <div className="grid grid-cols-1 gap-6">
               <div className="text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
                   <span className="text-xl">📸</span>
                 </div>
                 <h4 className="font-semibold mb-2">Upload Photo</h4>
@@ -395,7 +409,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
               </div>
               
               <div className="text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
                   <span className="text-xl">✨</span>
                 </div>
                 <h4 className="font-semibold mb-2">AI Magic</h4>
@@ -403,7 +417,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
               </div>
               
               <div className="text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
                   <span className="text-xl">💕</span>
                 </div>
                 <h4 className="font-semibold mb-2">Download & Share</h4>
@@ -421,7 +435,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
       
       {/* Upload Sheet */}
       <BottomSheet
-        isOpen={showUploadSheet}
+        isOpen={showUploadSheet && !isMaintenanceMode}
         onClose={() => setShowUploadSheet(false)}
         title="Upload Your Photo"
         snapPoints={[70, 90]}
@@ -436,7 +450,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
 
       {/* Prompt Sheet */}
       <BottomSheet
-        isOpen={showPromptSheet}
+        isOpen={showPromptSheet && !isMaintenanceMode}
         onClose={() => setShowPromptSheet(false)}
         title="Generate Portraits"
         snapPoints={[60, 80]}
@@ -453,7 +467,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
 
       {/* Modals */}
       <LimitReachedModal 
-        isOpen={showLimitModal}
+        isOpen={showLimitModal && !isMaintenanceMode}
         onClose={() => setShowLimitModal(false)}
         onEmailSubmitted={(email) => {
           console.log('Email submitted:', email);
@@ -462,7 +476,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
       />
       
       <LoginModal 
-        isOpen={showLoginModal}
+        isOpen={showLoginModal && !isMaintenanceMode}
         onClose={() => setShowLoginModal(false)}
         onSuccess={() => {
           setShowLoginModal(false);
@@ -473,7 +487,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
       
       {user && (
         <UserProfile
-          isOpen={showProfileModal}
+          isOpen={showProfileModal && !isMaintenanceMode}
           onClose={() => setShowProfileModal(false)}
           user={user}
           onSignOut={signOut}
@@ -483,6 +497,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
       {/* Toast Manager */}
       <MobileToastManager toasts={toasts} onDismiss={dismissToast} />
     </MobileAppShell>
+    </>
   );
 };
 

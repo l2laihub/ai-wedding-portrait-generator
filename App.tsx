@@ -132,21 +132,6 @@ function App({ navigate }: AppProps) {
     setAppReady(true);
   };
 
-  // Return mobile app experience for mobile devices
-  if (isMobile && !appReady) {
-    return (
-      <SplashScreen
-        onComplete={handleSplashComplete}
-        minDuration={2000}
-        showProgress={true}
-      />
-    );
-  }
-
-  if (isMobile && appReady) {
-    return <MobileApp navigate={navigate} />;
-  }
-
   // Handle escape key for upgrade modal
   useEffect(() => {
     const handleEscapeKey = (e: KeyboardEvent) => {
@@ -190,6 +175,21 @@ function App({ navigate }: AppProps) {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
   }, []);
+
+  // Return mobile app experience for mobile devices - moved after all hooks
+  if (isMobile && !appReady) {
+    return (
+      <SplashScreen
+        onComplete={handleSplashComplete}
+        minDuration={2000}
+        showProgress={true}
+      />
+    );
+  }
+
+  if (isMobile && appReady) {
+    return <MobileApp navigate={navigate} />;
+  }
 
   const handleImageUpload = (file: File) => {
     setSourceImageFile(file);

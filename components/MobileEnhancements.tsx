@@ -145,8 +145,8 @@ export const MobileButton: React.FC<{
     // Variant classes
     if (variant === 'primary') {
       baseClasses += ` 
-        bg-purple-600 text-white 
-        ${!disabled ? 'hover:bg-purple-700 active:bg-purple-800' : ''}
+        bg-gradient-to-r from-cyan-500 to-blue-600 text-white 
+        ${!disabled ? 'hover:from-cyan-600 hover:to-blue-700 active:from-cyan-700 active:to-blue-800' : ''}
         ${isMobile ? 'active:scale-95' : 'hover:scale-105'}
       `;
     } else {

@@ -22,8 +22,22 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
   const MAINTENANCE_MODE_ENABLED = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(MAINTENANCE_MODE_ENABLED);
+  
+  // Debug logging (can be removed in production)
+  React.useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('🔧 Maintenance Mode Debug:');
+      console.log('  VITE_MAINTENANCE_MODE env var:', import.meta.env.VITE_MAINTENANCE_MODE);
+      console.log('  MAINTENANCE_MODE_ENABLED:', MAINTENANCE_MODE_ENABLED);
+      console.log('  isMaintenanceMode state:', isMaintenanceMode);
+    }
+  }, []);
   const [adminOverride, setAdminOverride] = useState(() => {
-    return localStorage.getItem('admin-maintenance-override') === 'disable';
+    const override = localStorage.getItem('admin-maintenance-override') === 'disable';
+    if (import.meta.env.DEV) {
+      console.log('🔧 Admin override check:', override);
+    }
+    return override;
   });
 
   // Admin override functionality for testing
@@ -50,6 +64,12 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
       console.log(`  Admin Override: ${adminOverride ? 'YES' : 'NO'}`);
       console.log(`  You see: ${MAINTENANCE_MODE_ENABLED && !adminOverride ? 'MAINTENANCE' : 'NORMAL APP'}`);
     };
+
+    (window as any).clearAdminOverride = () => {
+      localStorage.removeItem('admin-maintenance-override');
+      setAdminOverride(false);
+      console.log('🔧 Admin override cleared. Refresh page to see maintenance if enabled.');
+    };
   }, [adminOverride]);
 
   const handleDismiss = () => {
@@ -59,15 +79,26 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
     }
   };
 
-  // Don't show if dismissed or if maintenance mode is disabled
-  if (isDismissed || !isMaintenanceMode) {
+  // Don't show if dismissed or if maintenance mode is disabled (unless admin override)
+  const shouldShow = !isDismissed && isMaintenanceMode && !adminOverride;
+  
+  if (import.meta.env.DEV) {
+    console.log('🔧 MaintenanceBanner render check:', {
+      isDismissed,
+      isMaintenanceMode,
+      adminOverride,
+      shouldShow
+    });
+  }
+  
+  if (!shouldShow) {
     return null;
   }
 
   // Modal overlay variant
   if (variant === 'modal') {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 999999 }}>
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full border border-gray-200 dark:border-gray-700">
           <div className="text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -89,10 +120,10 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
                 What's New:
               </h3>
               <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                <li>• Higher API limits for unlimited portraits</li>
+                <li>• Credits system for premium portraits</li>
+                <li>• User accounts & portrait galleries</li>
                 <li>• New wedding styles and themes</li>
-                <li>• Enhanced photo quality</li>
-                <li>• Improved mobile experience</li>
+                <li>• Enhanced photo quality & mobile experience</li>
               </ul>
             </div>
             
@@ -117,18 +148,18 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
   // Full page overlay variant
   if (variant === 'overlay') {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center" style={{ zIndex: 999999 }}>
         <div className="text-center p-8 max-w-2xl mx-auto">
           <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
             <Icon path="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" className="w-10 h-10 text-white" />
           </div>
           
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-            🚀 Major Updates in Progress
+            🚀 Premium Features Coming Soon
           </h1>
           
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
-            WedAI is getting amazing new features! We'll be back shortly with enhanced performance and unlimited portrait generation.
+            WedAI is getting amazing new features! We'll be back shortly with user accounts, credits system, and enhanced performance.
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -136,8 +167,8 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-4">
                 <Icon path="M13 10V3L4 14h7v7l9-11h-7z" className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Higher Limits</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Unlimited daily portrait generation for all users</p>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Credits System</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Premium credits for high-quality portrait generation</p>
             </div>
             
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
@@ -175,7 +206,7 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
             <div className="flex-1 min-w-0">
               <div className="font-semibold">🚀 Major Updates in Progress</div>
               <div className="text-sm text-blue-100">
-                Upgrading to unlimited portraits + new features. Back within 24 hours!
+                Adding user accounts, credits system + premium features. Back within 24 hours!
               </div>
             </div>
           </div>
