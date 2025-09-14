@@ -4,6 +4,8 @@ import SimpleFooter from './components/SimpleFooter';
 import Loader from './components/Loader';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import RateLimitToast from './components/RateLimitToast';
+import MaintenanceBanner from './components/MaintenanceBanner';
+import MaintenanceToggle from './components/MaintenanceToggle';
 import { NetworkStatus, PerformanceMonitor } from './components/MobileEnhancements';
 import { useTheme } from './hooks/useTheme';
 import { 
@@ -558,6 +560,12 @@ function App({ navigate }: AppProps) {
       
       {/* Performance Monitor (debug mode only) */}
       <PerformanceMonitor />
+      
+      {/* Maintenance Mode - Overlay when active */}
+      <MaintenanceBanner variant="overlay" />
+      
+      {/* Maintenance Toggle - Admin control */}
+      <MaintenanceToggle />
     </div>
   );
 }
