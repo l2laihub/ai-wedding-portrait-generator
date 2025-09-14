@@ -172,7 +172,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
   // Mobile upload handler wrapper
   const handleMobileImageUpload = (file: File) => {
     handleImageUpload(file);
-    showSuccess('Image uploaded successfully!');
+    // Only show notification on upload failure, not success
   };
 
   // Mobile generate handler wrapper
