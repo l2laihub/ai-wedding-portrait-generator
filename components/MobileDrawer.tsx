@@ -188,13 +188,11 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, navigate }
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center p-2">
-              <img 
-                src="/assets/wedai_logo_notext_nobg.png" 
-                alt="WedAI Logo" 
-                className="w-full h-full object-contain"
-              />
-            </div>
+            <img 
+              src="/assets/wedai_logo_notext_nobg.png" 
+              alt="WedAI Logo" 
+              className="w-12 h-12 object-contain"
+            />
             <div className="flex-1">
               <h2 className="font-bold text-gray-900 dark:text-white">WedAI</h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">AI Wedding Portraits</p>

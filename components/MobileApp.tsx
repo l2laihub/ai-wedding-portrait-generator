@@ -319,6 +319,22 @@ const MobileApp: React.FC<MobileAppProps> = ({
               generationId={currentGenerationId}
             />
             
+            {/* Try Again Section */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4">
+              <h3 className="font-semibold mb-3 text-center">Try Different Styles</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">
+                Modify your prompt and generate new portraits with the same photo
+              </p>
+              
+              {/* Custom Prompt Input for Regeneration */}
+              <SuspensePromptInput
+                onSubmit={handleMobileGenerate}
+                isLoading={isLoading}
+                customPrompt={customPrompt}
+                onCustomPromptChange={handleCustomPromptChange}
+              />
+            </div>
+            
             {/* New Image Button */}
             <div className="text-center">
               <button
