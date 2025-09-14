@@ -393,9 +393,9 @@ const MobileApp: React.FC<MobileAppProps> = ({
         {/* Footer Section - Always show */}
         <div className="mt-8 space-y-6">
           {/* App Description */}
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl p-4 text-center">
-            <div className="text-sm opacity-90 mb-2">Transform your couple photos into magical AI-generated wedding portraits</div>
-            <div className="text-xs opacity-75">Completely free, privacy-first, and optimized for all devices</div>
+          <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-xl p-4 text-center shadow-lg">
+            <div className="text-sm mb-2">Transform your couple photos into magical AI-generated wedding portraits</div>
+            <div className="text-xs text-gray-200">Completely free, privacy-first, and optimized for all devices</div>
             <div className="flex justify-center gap-2 mt-3 text-xs">
               <span className="flex items-center gap-1">❤️ Made with Love</span>
               <span className="flex items-center gap-1">🌟 Free Forever</span>
@@ -404,18 +404,18 @@ const MobileApp: React.FC<MobileAppProps> = ({
           </div>
           
           {/* Usage Statistics */}
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl p-4">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white rounded-xl p-4 shadow-lg">
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold">954</div>
-                <div className="text-sm opacity-90">Total Portraits</div>
+                <div className="text-sm text-blue-100">Total Portraits</div>
               </div>
               <div>
                 <div className="text-2xl font-bold">653</div>
-                <div className="text-sm opacity-90">Today's Portraits</div>
+                <div className="text-sm text-blue-100">Today's Portraits</div>
               </div>
             </div>
-            <div className="text-center mt-3 text-xs opacity-75">Powered by Google Gemini AI</div>
+            <div className="text-center mt-3 text-xs text-blue-200">Powered by Google Gemini AI</div>
           </div>
           
           {/* Footer */}
