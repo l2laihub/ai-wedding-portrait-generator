@@ -206,6 +206,28 @@ class PostHogService {
   }
 
   /**
+   * Track page views manually
+   */
+  trackPageView(pageName?: string, properties?: Record<string, any>): void {
+    if (!this.initialized) {
+      return;
+    }
+
+    try {
+      posthog.capture('$pageview', {
+        $current_url: window.location.href,
+        $host: window.location.host,
+        $pathname: window.location.pathname,
+        $referrer: document.referrer,
+        pageName,
+        ...properties,
+      });
+    } catch (error) {
+      console.warn('PostHog page view tracking error (continuing silently):', error);
+    }
+  }
+
+  /**
    * Track image upload events
    */
   trackImageUpload(status: 'started' | 'completed' | 'failed', properties: Partial<ImageUploadProperties>): void {

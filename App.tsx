@@ -117,6 +117,8 @@ function App({ navigate }: AppProps) {
   const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [appReady, setAppReady] = useState<boolean>(false);
+  // Current styles being generated (for progress tracking consistency)
+  const [currentStyles, setCurrentStyles] = useState<string[]>([]);
   // Real-time generation progress tracking
   const [generationProgress, setGenerationProgress] = useState<Array<{
     style: string;
@@ -183,6 +185,7 @@ function App({ navigate }: AppProps) {
     
     // Initialize progress tracking
     const stylesToGenerate = getRandomWeddingStyles();
+    setCurrentStyles(stylesToGenerate); // Store for consistent use across components
     const initialProgress = stylesToGenerate.map(style => ({
       style,
       status: 'waiting' as const
@@ -523,6 +526,7 @@ function App({ navigate }: AppProps) {
     setGeneratedContents(null);
     setError(null);
     setCurrentGenerationId(null);
+    setCurrentStyles([]);
     setGenerationProgress([]);
   };
 
@@ -616,7 +620,7 @@ function App({ navigate }: AppProps) {
         setShowProfileModal={setShowProfileModal}
         setLoginMode={setLoginMode}
         // Mobile-specific props
-        stylesToGenerate={getRandomWeddingStyles()}
+        stylesToGenerate={currentStyles}
         generationProgress={generationProgress}
         resetState={resetState}
       />

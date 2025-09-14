@@ -14,7 +14,7 @@ if (posthogApiKey && posthogApiKey.startsWith('phc_')) {
     apiKey: posthogApiKey,
     apiHost: process.env.POSTHOG_API_HOST,
     autocapture: false,
-    capturePageview: false,
+    capturePageview: true,
     capturePageleave: false,
     persistence: 'localStorage',
     loaded: (posthog) => {
@@ -29,6 +29,9 @@ if (posthogApiKey && posthogApiKey.startsWith('phc_')) {
         screenHeight: window.screen.height,
         devicePixelRatio: window.devicePixelRatio,
       });
+      
+      // Track page view for web analytics
+      posthogService.trackPageView('Home');
     }
   });
 } else {
