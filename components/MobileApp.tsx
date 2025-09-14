@@ -222,21 +222,26 @@ const MobileApp: React.FC<MobileAppProps> = ({
         headerTitle="Generating Portraits..."
         navigate={navigate}
       >
-        <div className="space-y-6 p-4">
-          <PhotoTypeSelectorSkeleton />
-          <UsageCounterSkeleton />
-          <ImageUploaderSkeleton />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+          {/* Show current photo being processed */}
+          {sourceImageUrl && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-6 w-full max-w-sm">
+              <h3 className="font-semibold mb-3 text-center">Processing Your Photo</h3>
+              <img 
+                src={sourceImageUrl} 
+                alt="Processing" 
+                className="w-full max-h-48 object-contain rounded-lg"
+              />
+            </div>
+          )}
           
-          {/* Enhanced loading with progress */}
+          {/* Enhanced loading with progress - main focus */}
           <GenerationProgress
             styles={currentStyles}
             currentIndex={0}
             completedCount={0}
-            className="mb-4"
+            className="w-full max-w-md"
           />
-          
-          <Loader message="Creating your wedding portraits..." />
-          <ImageDisplaySkeleton count={3} />
         </div>
         <MobileToastManager toasts={toasts} onDismiss={dismissToast} />
       </MobileAppShell>
@@ -296,25 +301,13 @@ const MobileApp: React.FC<MobileAppProps> = ({
               </button>
             </div>
             
-            {/* Custom Prompt Input */}
-            <div className="mb-4">
-              <SuspensePromptInput
-                onSubmit={handleMobileGenerate}
-                isLoading={isLoading}
-                customPrompt={customPrompt}
-                onCustomPromptChange={handleCustomPromptChange}
-              />
-            </div>
-            
-            {/* Direct Generate Button */}
-            <button
-              onClick={handleMobileGenerate}
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
-            >
-              <span className="text-xl">✨</span>
-              Generate Wedding Portraits
-            </button>
+            {/* Custom Prompt Input with Generate Button */}
+            <SuspensePromptInput
+              onSubmit={handleMobileGenerate}
+              isLoading={isLoading}
+              customPrompt={customPrompt}
+              onCustomPromptChange={handleCustomPromptChange}
+            />
           </div>
         )}
 
@@ -380,6 +373,59 @@ const MobileApp: React.FC<MobileAppProps> = ({
             </div>
           </div>
         )}
+        
+        {/* Footer Section - Always show */}
+        <div className="mt-8 space-y-6">
+          {/* App Description */}
+          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl p-4 text-center">
+            <div className="text-sm opacity-90 mb-2">Transform your couple photos into magical AI-generated wedding portraits</div>
+            <div className="text-xs opacity-75">Completely free, privacy-first, and optimized for all devices</div>
+            <div className="flex justify-center gap-2 mt-3 text-xs">
+              <span className="flex items-center gap-1">❤️ Made with Love</span>
+              <span className="flex items-center gap-1">🌟 Free Forever</span>
+              <span className="flex items-center gap-1">🔒 Your Privacy Matters</span>
+            </div>
+          </div>
+          
+          {/* Usage Statistics */}
+          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl p-4">
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold">954</div>
+                <div className="text-sm opacity-90">Total Portraits</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">653</div>
+                <div className="text-sm opacity-90">Today's Portraits</div>
+              </div>
+            </div>
+            <div className="text-center mt-3 text-xs opacity-75">Powered by Google Gemini AI</div>
+          </div>
+          
+          {/* Footer */}
+          <div className="text-center space-y-3 pb-20">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              © 2025 HuyBuilds. All rights reserved. WedAI is free to use.
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">
+              We use anonymous analytics to improve the app.
+            </div>
+            <div className="flex justify-center gap-4 pt-2">
+              <button 
+                onClick={() => navigate('privacy')} 
+                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Privacy
+              </button>
+              <button 
+                onClick={() => navigate('terms')} 
+                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Terms
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* FloatingActionButton removed - using inline generate button instead */}
