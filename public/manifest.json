@@ -1,12 +1,14 @@
 {
-  "name": "WedAI - AI Wedding Portraits by HuyBuilds",
+  "name": "WedAI - AI Wedding Portrait Generator",
   "short_name": "WedAI",
-  "description": "Transform your couple photos into magical AI-generated wedding portraits. Choose from 6 unique wedding styles at wedai.huybuilds.app",
-  "start_url": "/",
+  "description": "Transform your couple photos into magical AI-generated wedding portraits with 10 unique styles. Mobile-first PWA experience.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#7C3AED",
-  "background_color": "#111827",
+  "background_color": "#0f0f0f",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "icons": [
     {
       "src": "/icons/icon-32x32.png",
@@ -80,7 +82,7 @@
     {
       "name": "Generate Wedding Portraits",
       "short_name": "Generate",
-      "description": "Upload a couple photo to generate AI wedding portraits with WedAI",
+      "description": "Upload a couple photo to generate AI wedding portraits",
       "url": "/?action=upload",
       "icons": [
         {
@@ -88,6 +90,40 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "View Gallery",
+      "short_name": "Gallery",
+      "description": "View your generated wedding portraits",
+      "url": "/?tab=gallery",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
-  ]
+  ],
+  "edge_side_panel": {
+    "preferred_width": 320
+  },
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "handle_links": "preferred",
+  "file_handlers": [
+    {
+      "action": "/?action=upload",
+      "accept": {
+        "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+      }
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "wedai",
+      "url": "/?protocol=%s"
+    }
+  ],
+  "capture_links": "new-client"
 }

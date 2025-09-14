@@ -10,8 +10,11 @@ import UsageCounter from './components/UsageCounter';
 import LimitReachedModal from './components/LimitReachedModal';
 import UpgradePrompt from './components/UpgradePrompt';
 import { NetworkStatus, PerformanceMonitor } from './components/MobileEnhancements';
+import MobileApp from './components/MobileApp';
+import SplashScreen from './components/SplashScreen';
 import { rateLimiter } from './utils/rateLimiter';
 import { databaseService } from './services/databaseService';
+import { creditsService } from './services/creditsService';
 import LoginModal from './components/LoginModal';
 import UserProfile from './components/UserProfile';
 import { useAuth } from './hooks/useAuth';
@@ -112,6 +115,8 @@ function App({ navigate }: AppProps) {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
+  const [showSplash, setShowSplash] = useState<boolean>(true);
+  const [appReady, setAppReady] = useState<boolean>(false);
   
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
@@ -120,6 +125,27 @@ function App({ navigate }: AppProps) {
   // Temporarily disable feature flags to prevent race conditions
   // const { flags: featureFlags } = useAppFeatureFlags();
   const featureFlags = { enable_sequential_generation: false };
+
+  // Mobile app initialization
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    setAppReady(true);
+  };
+
+  // Return mobile app experience for mobile devices
+  if (isMobile && !appReady) {
+    return (
+      <SplashScreen
+        onComplete={handleSplashComplete}
+        minDuration={2000}
+        showProgress={true}
+      />
+    );
+  }
+
+  if (isMobile && appReady) {
+    return <MobileApp navigate={navigate} />;
+  }
 
   // Handle escape key for upgrade modal
   useEffect(() => {
@@ -236,11 +262,22 @@ function App({ navigate }: AppProps) {
       return;
     }
 
-    // Check rate limits before proceeding
-    const limitCheck = rateLimiter.checkLimit();
-    if (!limitCheck.canProceed) {
-      setShowLimitModal(true);
-      return;
+    // Check credit balance before proceeding
+    let canProceed = true;
+    if (user) {
+      // For authenticated users, check credits service
+      const balance = await creditsService.getBalance();
+      if (!balance.canUseCredits) {
+        setShowLimitModal(true);
+        return;
+      }
+    } else {
+      // For anonymous users, use rate limiter
+      const limitCheck = rateLimiter.checkLimit();
+      if (!limitCheck.canProceed) {
+        setShowLimitModal(true);
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -248,7 +285,19 @@ function App({ navigate }: AppProps) {
     setGeneratedContents(null);
 
     // Consume a credit for this generation
-    const creditResult = rateLimiter.consumeCredit();
+    let creditConsumed = false;
+    if (user) {
+      const consumeResult = await creditsService.consumeCredit(`Portrait generation - ${photoType}`);
+      if (!consumeResult.success) {
+        setError(consumeResult.error || 'Failed to consume credit');
+        setIsLoading(false);
+        return;
+      }
+      creditConsumed = true;
+    } else {
+      const creditResult = rateLimiter.consumeCredit();
+      creditConsumed = creditResult.canProceed;
+    }
     
     // Generate unique ID for this generation session
     const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

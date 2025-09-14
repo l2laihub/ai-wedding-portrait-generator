@@ -6,6 +6,7 @@ import { useLazyImage } from '../hooks/useIntersectionObserver';
 import { useTouch } from '../hooks/useTouch';
 import { posthogService } from '../services/posthogService';
 import ImagePreviewModal from './ImagePreviewModal';
+import SwipeableGallery from './SwipeableGallery';
 
 interface ImageDisplayProps {
   contents: GeneratedContent[];
@@ -330,24 +331,31 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId }) =
     return null;
   }
 
+  // Use SwipeableGallery on mobile for better UX
+  if (isMobile) {
+    return (
+      <div className="mt-10 w-full">
+        <h2 className="font-bold text-center text-gray-900 dark:text-white mb-6 text-2xl">
+          Your Wedding Portraits
+        </h2>
+        <SwipeableGallery
+          contents={contents}
+          generationId={generationId}
+        />
+      </div>
+    );
+  }
+
+  // Desktop grid layout
   const getGridClasses = () => {
-    if (isMobile) {
-      return 'grid grid-cols-1 gap-4';
-    }
     return 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
   };
 
   return (
-    <div className={`mt-10 w-full mx-auto ${isMobile ? 'px-2' : 'max-w-7xl'}`}>
-      <h2 className={`font-bold text-center text-black mb-6 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>
+    <div className="mt-10 w-full mx-auto max-w-7xl">
+      <h2 className="font-bold text-center text-gray-900 dark:text-white mb-6 text-3xl">
         Your Wedding Portraits
       </h2>
-      
-      {isMobile && (
-        <p className="text-center text-gray-400 text-sm mb-4">
-          Tap images to show actions
-        </p>
-      )}
       
       <div className={getGridClasses()}>
         {contents.map((content, index) => (

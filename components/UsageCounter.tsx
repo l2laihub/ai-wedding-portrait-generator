@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { rateLimiter, RateLimitResult } from '../utils/rateLimiter';
+import { creditsService, CreditBalance } from '../services/creditsService';
+import { useAuth } from '../hooks/useAuth';
 
 interface UsageCounterProps {
   className?: string;
@@ -13,29 +15,44 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
   variant = 'compact',
   showTimeUntilReset = false
 }) => {
+  const { user } = useAuth();
   const [limitInfo, setLimitInfo] = useState<RateLimitResult | null>(null);
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const [timeUntilReset, setTimeUntilReset] = useState<string>('');
 
-  const updateLimitInfo = () => {
-    const info = rateLimiter.checkLimit();
-    setLimitInfo(info);
-    
-    if (showTimeUntilReset) {
-      setTimeUntilReset(rateLimiter.getTimeUntilReset());
+  const updateUsageInfo = async () => {
+    if (user) {
+      // For authenticated users, get credit balance
+      const balance = await creditsService.getBalance();
+      setCreditBalance(balance);
+      setLimitInfo(null);
+      
+      if (showTimeUntilReset) {
+        setTimeUntilReset(creditsService.getTimeUntilReset());
+      }
+    } else {
+      // For anonymous users, use rate limiter
+      const info = rateLimiter.checkLimit();
+      setLimitInfo(info);
+      setCreditBalance(null);
+      
+      if (showTimeUntilReset) {
+        setTimeUntilReset(rateLimiter.getTimeUntilReset());
+      }
     }
   };
 
   useEffect(() => {
     // Initial load
-    updateLimitInfo();
+    updateUsageInfo();
 
     // Update every minute to keep time until reset accurate
-    const interval = setInterval(updateLimitInfo, 60000);
+    const interval = setInterval(updateUsageInfo, 60000);
 
-    // Listen for storage changes (in case user opens multiple tabs)
+    // Listen for storage changes (in case user opens multiple tabs) - only for anonymous users
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'wedai_usage') {
-        updateLimitInfo();
+      if (e.key === 'wedai_usage' && !user) {
+        updateUsageInfo();
       }
     };
 
@@ -45,25 +62,35 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [showTimeUntilReset]);
+  }, [showTimeUntilReset, user]);
 
-  if (!limitInfo) {
+  if (!limitInfo && !creditBalance) {
     return null;
   }
 
+  // Determine display values based on user type
+  const isAuthenticated = !!user;
+  const remaining = isAuthenticated ? creditBalance?.totalAvailable || 0 : limitInfo?.remaining || 0;
+  const total = isAuthenticated ? creditBalance?.totalAvailable || 0 : limitInfo?.total || 0;
+  const used = isAuthenticated ? 
+    (creditBalance?.freeCreditsUsed || 0) : 
+    (limitInfo?.total || 0) - (limitInfo?.remaining || 0);
+
   const getStatusColor = () => {
-    if (limitInfo.remaining === 0) return 'text-red-600 dark:text-red-400';
-    if (limitInfo.remaining === 1) return 'text-amber-600 dark:text-amber-400';
+    if (remaining === 0) return 'text-red-600 dark:text-red-400';
+    if (remaining <= 2) return 'text-amber-600 dark:text-amber-400';
     return 'text-green-600 dark:text-green-400';
   };
 
   const getProgressBarColor = () => {
-    if (limitInfo.remaining === 0) return 'bg-red-500';
-    if (limitInfo.remaining === 1) return 'bg-amber-500';
+    if (remaining === 0) return 'bg-red-500';
+    if (remaining <= 2) return 'bg-amber-500';
     return 'bg-green-500';
   };
 
-  const progressPercentage = Math.round(((limitInfo.total - limitInfo.remaining) / limitInfo.total) * 100);
+  const progressPercentage = isAuthenticated ? 
+    (total > 0 ? Math.round(((total - remaining) / total) * 100) : 0) :
+    Math.round(((limitInfo?.total || 0) - (limitInfo?.remaining || 0)) / (limitInfo?.total || 1) * 100);
 
   if (variant === 'compact') {
     return (
@@ -73,9 +100,19 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           className={`w-4 h-4 ${getStatusColor()}`} 
         />
         <span className={`font-medium ${getStatusColor()}`}>
-          {limitInfo.remaining}/{limitInfo.total} free portraits today
+          {isAuthenticated ? (
+            creditBalance?.totalAvailable ? (
+              creditBalance.freeCreditsRemaining > 0 ? 
+                `${creditBalance.freeCreditsRemaining}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} credits` :
+                `${creditBalance.totalAvailable} credits available`
+            ) : (
+              '0 credits remaining'
+            )
+          ) : (
+            `${limitInfo?.remaining}/${limitInfo?.total} free portraits today`
+          )}
         </span>
-        {showTimeUntilReset && limitInfo.isAtLimit && (
+        {showTimeUntilReset && remaining === 0 && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
             (resets in {timeUntilReset})
           </span>
@@ -93,11 +130,14 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
             className={`w-5 h-5 ${getStatusColor()}`} 
           />
           <h3 className="font-medium text-gray-900 dark:text-white">
-            Daily Usage
+            {isAuthenticated ? 'Credit Balance' : 'Daily Usage'}
           </h3>
         </div>
         <span className={`text-lg font-bold ${getStatusColor()}`}>
-          {limitInfo.remaining}/{limitInfo.total}
+          {isAuthenticated ? 
+            `${creditBalance?.totalAvailable || 0} credits` :
+            `${limitInfo?.remaining}/${limitInfo?.total}`
+          }
         </span>
       </div>
 
@@ -117,25 +157,45 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
 
       {/* Status Message */}
       <div className="text-sm text-gray-600 dark:text-gray-400">
-        {limitInfo.remaining > 0 ? (
-          <span>
-            You have <strong className={getStatusColor()}>{limitInfo.remaining}</strong> free portrait
-            {limitInfo.remaining !== 1 ? 's' : ''} remaining today.
-          </span>
+        {isAuthenticated ? (
+          creditBalance?.totalAvailable && creditBalance.totalAvailable > 0 ? (
+            <div className="space-y-1">
+              {creditBalance.freeCreditsRemaining > 0 && (
+                <div>Free today: <strong className={getStatusColor()}>{creditBalance.freeCreditsRemaining}/3</strong></div>
+              )}
+              {creditBalance.paidCredits > 0 && (
+                <div>Purchased: <strong className="text-blue-600 dark:text-blue-400">{creditBalance.paidCredits}</strong></div>
+              )}
+              {creditBalance.bonusCredits > 0 && (
+                <div>Bonus: <strong className="text-green-600 dark:text-green-400">{creditBalance.bonusCredits}</strong></div>
+              )}
+            </div>
+          ) : (
+            <span>
+              No credits remaining. Purchase credits to generate more portraits.
+            </span>
+          )
         ) : (
-          <span>
-            You've reached your daily limit. 
-            {showTimeUntilReset && (
-              <span className="ml-1">
-                Resets in <strong>{timeUntilReset}</strong>.
-              </span>
-            )}
-          </span>
+          limitInfo?.remaining && limitInfo.remaining > 0 ? (
+            <span>
+              You have <strong className={getStatusColor()}>{limitInfo.remaining}</strong> free portrait
+              {limitInfo.remaining !== 1 ? 's' : ''} remaining today.
+            </span>
+          ) : (
+            <span>
+              You've reached your daily limit. 
+              {showTimeUntilReset && (
+                <span className="ml-1">
+                  Resets in <strong>{timeUntilReset}</strong>.
+                </span>
+              )}
+            </span>
+          )
         )}
       </div>
 
       {/* Reset Info */}
-      {showTimeUntilReset && (
+      {showTimeUntilReset && !isAuthenticated && (
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <Icon 
