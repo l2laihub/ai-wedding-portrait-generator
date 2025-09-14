@@ -16,27 +16,41 @@ const MaintenanceBanner: React.FC<MaintenanceBannerProps> = ({
     return allowDismiss && sessionStorage.getItem('maintenance-banner-dismissed') === 'true';
   });
 
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(() => {
-    return localStorage.getItem('maintenance-mode') === 'true';
+  // 🚨 MAINTENANCE MODE - Controlled by environment variable
+  // Set VITE_MAINTENANCE_MODE=true in .env to enable for all users
+  // Set VITE_MAINTENANCE_MODE=false in .env to disable for all users
+  const MAINTENANCE_MODE_ENABLED = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(MAINTENANCE_MODE_ENABLED);
+  const [adminOverride, setAdminOverride] = useState(() => {
+    return localStorage.getItem('admin-maintenance-override') === 'disable';
   });
 
-  // Listen for maintenance mode changes
+  // Admin override functionality for testing
   React.useEffect(() => {
-    const checkMaintenanceMode = () => {
-      setIsMaintenanceMode(localStorage.getItem('maintenance-mode') === 'true');
+    // Make admin functions globally available
+    (window as any).disableMaintenanceForAdmin = () => {
+      localStorage.setItem('admin-maintenance-override', 'disable');
+      setAdminOverride(true);
+      console.log('🔧 Maintenance disabled for ADMIN view only');
+      console.log('🔧 Other users still see maintenance mode');
+      console.log('🔧 Refresh page to see normal app');
+    };
+    
+    (window as any).enableMaintenanceForAdmin = () => {
+      localStorage.removeItem('admin-maintenance-override');
+      setAdminOverride(false);
+      console.log('🔧 Admin override removed');
+      console.log('🔧 You now see maintenance like other users');
     };
 
-    // Check periodically for changes
-    const interval = setInterval(checkMaintenanceMode, 1000);
-    
-    // Also listen for storage events from other tabs
-    window.addEventListener('storage', checkMaintenanceMode);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('storage', checkMaintenanceMode);
+    (window as any).checkMaintenanceStatus = () => {
+      console.log('🔧 Maintenance Status:');
+      console.log(`  Global: ${MAINTENANCE_MODE_ENABLED ? 'ENABLED' : 'DISABLED'}`);
+      console.log(`  Admin Override: ${adminOverride ? 'YES' : 'NO'}`);
+      console.log(`  You see: ${MAINTENANCE_MODE_ENABLED && !adminOverride ? 'MAINTENANCE' : 'NORMAL APP'}`);
     };
-  }, []);
+  }, [adminOverride]);
 
   const handleDismiss = () => {
     if (allowDismiss) {

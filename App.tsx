@@ -6,7 +6,15 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import RateLimitToast from './components/RateLimitToast';
 import MaintenanceBanner from './components/MaintenanceBanner';
 import MaintenanceToggle from './components/MaintenanceToggle';
+import UsageCounter from './components/UsageCounter';
+import LimitReachedModal from './components/LimitReachedModal';
+import UpgradePrompt from './components/UpgradePrompt';
 import { NetworkStatus, PerformanceMonitor } from './components/MobileEnhancements';
+import { rateLimiter } from './utils/rateLimiter';
+import { databaseService } from './services/databaseService';
+import LoginModal from './components/LoginModal';
+import UserProfile from './components/UserProfile';
+import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { 
   SuspenseImageUploader, 
@@ -99,13 +107,39 @@ function App({ navigate }: AppProps) {
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
   const [photoType, setPhotoType] = useState<'single' | 'couple' | 'family'>('couple');
   const [familyMemberCount, setFamilyMemberCount] = useState<number>(4);
+  const [showLimitModal, setShowLimitModal] = useState<boolean>(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+  const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
   
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
+  const { user, isLoading: authLoading, isAuthenticated, signOut } = useAuth();
   // Temporarily disable feature flags to prevent race conditions
   // const { flags: featureFlags } = useAppFeatureFlags();
   const featureFlags = { enable_sequential_generation: false };
+
+  // Handle escape key for upgrade modal
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showUpgradePrompt) {
+          setShowUpgradePrompt(false);
+        }
+      }
+    };
+
+    if (showUpgradePrompt) {
+      document.addEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.removeEventListener('keydown', handleEscapeKey);
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [showUpgradePrompt]);
 
   // Preload critical components on app mount and identify user
   useEffect(() => {
@@ -174,6 +208,23 @@ function App({ navigate }: AppProps) {
     });
   };
 
+  // Authentication handlers
+  const handleLogin = (mode: 'signin' | 'signup' = 'signin') => {
+    setLoginMode(mode);
+    setShowLoginModal(true);
+  };
+
+  const handleLoginSuccess = (user: any) => {
+    console.log('User logged in:', user);
+    setShowLoginModal(false);
+    // Show a brief success message or update UI
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setShowProfileModal(false);
+  };
+
   const handleGenerate = async () => {
     if (!sourceImageFile) {
       setError("Please upload an image first.");
@@ -185,10 +236,20 @@ function App({ navigate }: AppProps) {
       return;
     }
 
+    // Check rate limits before proceeding
+    const limitCheck = rateLimiter.checkLimit();
+    if (!limitCheck.canProceed) {
+      setShowLimitModal(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedContents(null);
 
+    // Consume a credit for this generation
+    const creditResult = rateLimiter.consumeCredit();
+    
     // Generate unique ID for this generation session
     const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setCurrentGenerationId(generationId);
@@ -205,6 +266,11 @@ function App({ navigate }: AppProps) {
         timestamp: Date.now(),
         photoType,
         familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
+      });
+      
+      // Track each style in database analytics
+      stylesToGenerate.forEach(async (style) => {
+        await databaseService.trackUsage(generationId, photoType, style);
       });
       
       // Adjust generation strategy for slow connections or feature flag
@@ -410,7 +476,10 @@ function App({ navigate }: AppProps) {
       <NetworkStatus />
       
       {/* Simple Clean Header */}
-      <SimpleHeader />
+      <SimpleHeader 
+        onLogin={handleLogin}
+        onProfile={() => setShowProfileModal(true)}
+      />
       
       <main className={getMainClasses()}>
         <div className={isMobile ? "space-y-4" : "space-y-8"}>
@@ -420,6 +489,11 @@ function App({ navigate }: AppProps) {
             familyMemberCount={familyMemberCount}
             onFamilyMemberCountChange={setFamilyMemberCount}
           />
+
+          {/* Usage Counter */}
+          <div className="flex justify-center">
+            <UsageCounter variant="compact" showTimeUntilReset={true} />
+          </div>
           
           <SuspenseImageUploader 
             onImageUpload={handleImageUpload} 
@@ -500,10 +574,26 @@ function App({ navigate }: AppProps) {
             <SuspenseImageDisplay contents={generatedContents} generationId={currentGenerationId} />
           )}
 
-          {/* How it works - only show when no image uploaded */}
-          {!sourceImageUrl && !isLoading && (
-            <div className="max-w-4xl mx-auto mt-12 p-8 bg-white/60 dark:bg-gray-800/40 rounded-3xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm shadow-xl transition-colors duration-300">
-              <h3 className="text-2xl font-bold text-center mb-8 text-gray-900 dark:text-white transition-colors duration-300">How It Works</h3>
+          {/* Upgrade Prompt or How it works - only show when no image uploaded */}
+          {!sourceImageUrl && !isLoading && (() => {
+            const usageStats = rateLimiter.getUsageStats();
+            
+            // Show upgrade prompt if user has used 2+ portraits
+            if (usageStats.used >= 2) {
+              return (
+                <div className="max-w-2xl mx-auto mt-12">
+                  <UpgradePrompt 
+                    variant="card"
+                    onJoinWaitlist={() => setShowLimitModal(true)}
+                  />
+                </div>
+              );
+            }
+            
+            // Show how it works for new users
+            return (
+              <div className="max-w-4xl mx-auto mt-12 p-8 bg-white/60 dark:bg-gray-800/40 rounded-3xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm shadow-xl transition-colors duration-300">
+                <h3 className="text-2xl font-bold text-center mb-8 text-gray-900 dark:text-white transition-colors duration-300">How It Works</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -545,7 +635,8 @@ function App({ navigate }: AppProps) {
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       </main>
       
@@ -566,6 +657,60 @@ function App({ navigate }: AppProps) {
       
       {/* Maintenance Toggle - Admin control */}
       <MaintenanceToggle />
+      
+      {/* Rate Limit Modal */}
+      <LimitReachedModal 
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        onEmailSubmitted={(email) => {
+          console.log('Email submitted to waitlist:', email);
+          // TODO: Integrate with Supabase when database is setup
+        }}
+      />
+      
+      {/* Upgrade Prompt Modal */}
+      {showUpgradePrompt && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowUpgradePrompt(false);
+            }
+          }}
+        >
+          <div 
+            className="max-w-md w-full animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <UpgradePrompt 
+              variant="card"
+              showClose={true}
+              onClose={() => setShowUpgradePrompt(false)}
+              onJoinWaitlist={() => setShowLimitModal(true)}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={handleLoginSuccess}
+        defaultMode={loginMode}
+        title={loginMode === 'signup' ? 'Create Account' : undefined}
+        subtitle={loginMode === 'signup' ? 'Join to unlock unlimited portraits' : undefined}
+      />
+      
+      {/* User Profile Modal */}
+      {user && (
+        <UserProfile
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          user={user}
+          onSignOut={handleSignOut}
+        />
+      )}
     </div>
   );
 }
