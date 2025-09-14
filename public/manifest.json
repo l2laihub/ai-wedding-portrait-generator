@@ -1,7 +1,7 @@
 {
   "name": "WedAI - AI Wedding Portrait Generator",
   "short_name": "WedAI",
-  "description": "Transform your couple photos into magical AI-generated wedding portraits with 10 unique styles. Mobile-first PWA experience.",
+  "description": "Transform your couple photos into magical AI-generated wedding portraits with 12 unique styles. Mobile-first PWA experience.",
   "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -71,7 +71,7 @@
   "prefer_related_applications": false,
   "features": [
     "AI wedding portrait generation",
-    "6 unique wedding styles",
+    "12 unique wedding styles",
     "Mobile-first design",
     "Free downloads with timestamps",
     "Social sharing integration",

@@ -59,7 +59,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           path="M13 10V3L4 14h7v7l9-11h-7z" 
           className="w-4 h-4 text-blue-600 dark:text-blue-400" 
         />
-        <span>Premium plans launching soon!</span>
+        <span>🚀 Launch weekend special - 50% OFF!</span>
         <button
           onClick={onJoinWaitlist}
           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium ml-1 transition-colors"
@@ -143,24 +143,37 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
 
         {/* Pricing Teaser */}
         <div className="bg-white dark:bg-gray-700 rounded-lg p-4 mb-6 border border-gray-200 dark:border-gray-600">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">Early Bird Pricing</div>
-          <div className="flex items-center justify-center gap-4">
-            <div className="text-center">
-              <div className="text-lg font-bold text-gray-900 dark:text-white">$4.99</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Starter Pack<br/>5 portraits</div>
-            </div>
-            <div className="text-center relative">
-              <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                <span className="bg-gradient-to-r from-blue-600 to-teal-600 text-white text-xs px-2 py-1 rounded-full">
-                  Most Popular
-                </span>
+          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 text-center">🚀 Launch Weekend Special</div>
+          <div className="text-xs text-center text-orange-600 dark:text-orange-400 font-medium mb-4">50% OFF - This Weekend Only!</div>
+          <div className="space-y-4">
+            {/* Pricing Grid */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                <div className="text-lg font-bold text-gray-900 dark:text-white mb-1">$4.99</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="font-medium">Starter</div>
+                  <div>10 credits</div>
+                  <div className="text-orange-600 dark:text-orange-400 text-[10px] mt-1">Launch Price</div>
+                </div>
               </div>
-              <div className="text-lg font-bold text-gray-900 dark:text-white">$9.99</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Wedding Pack<br/>20 portraits</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-gray-900 dark:text-white">$19.99</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Party Pack<br/>50 portraits</div>
+              
+              <div className="text-center bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border-2 border-blue-200 dark:border-blue-700">
+                <div className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-1">$9.99</div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">
+                  <div className="font-medium">Wedding</div>
+                  <div>25 credits</div>
+                  <div className="text-blue-600 dark:text-blue-400 text-[10px] mt-1">Most Popular</div>
+                </div>
+              </div>
+              
+              <div className="text-center bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-700">
+                <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-1">$24.99</div>
+                <div className="text-xs text-green-600 dark:text-green-400">
+                  <div className="font-medium">Party</div>
+                  <div>75 credits</div>
+                  <div className="text-green-600 dark:text-green-400 text-[10px] mt-1">Best Value</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -174,7 +187,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
         </button>
 
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-          Be the first to know when premium plans launch + get 50% off early bird discount
+          Everyone who joins gets 10 bonus credits! 50% off pricing is only for this weekend's launch 🎉
         </p>
       </div>
     </div>

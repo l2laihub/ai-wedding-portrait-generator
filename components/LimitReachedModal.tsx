@@ -140,7 +140,7 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
                   />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  You've used all 3 free portraits today!
+                  You've used all 5 free portraits today!
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
                   Your daily limit resets in <strong className="text-amber-600 dark:text-amber-400">{timeUntilReset}</strong>

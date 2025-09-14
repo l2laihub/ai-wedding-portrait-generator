@@ -4,6 +4,7 @@ import { useViewport } from '../hooks/useViewport';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { useGenerationCounter } from '../hooks/useGenerationCounter';
 
 // Enhanced mobile components
 import MobileAppShell from './MobileAppShell';
@@ -21,6 +22,7 @@ import UserProfile from './UserProfile';
 import LimitReachedModal from './LimitReachedModal';
 import ImagePreviewModal from './ImagePreviewModal';
 import MaintenanceBanner from './MaintenanceBanner';
+import UpgradePrompt from './UpgradePrompt';
 
 // Skeleton components
 import {
@@ -126,6 +128,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
+  const { totalGenerations, dailyGenerations } = useGenerationCounter();
   const { user, isAuthenticated, signOut } = useAuth();
   
   // Check maintenance mode
@@ -396,6 +399,22 @@ const MobileApp: React.FC<MobileAppProps> = ({
             </div>
           </div>
         )}
+
+        {/* Upgrade Prompt - Show when user has used 5+ portraits */}
+        {!sourceImageUrl && !isLoading && (() => {
+          const usageStats = rateLimiter.getUsageStats();
+          if (usageStats.used >= 5) {
+            return (
+              <div className="mt-6">
+                <UpgradePrompt 
+                  variant="card"
+                  onJoinWaitlist={() => setShowLimitModal(true)}
+                />
+              </div>
+            );
+          }
+          return null;
+        })()}
         
         {/* Footer Section - Always show */}
         <div className="mt-8 space-y-6">
@@ -414,11 +433,11 @@ const MobileApp: React.FC<MobileAppProps> = ({
           <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white rounded-xl p-4 shadow-lg">
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold">954</div>
+                <div className="text-2xl font-bold">{totalGenerations.toLocaleString()}</div>
                 <div className="text-sm text-blue-100">Total Portraits</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">653</div>
+                <div className="text-2xl font-bold">{dailyGenerations}</div>
                 <div className="text-sm text-blue-100">Today's Portraits</div>
               </div>
             </div>

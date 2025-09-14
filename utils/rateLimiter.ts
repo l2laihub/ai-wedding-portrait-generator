@@ -25,10 +25,13 @@ export interface RateLimitResult {
 
 class RateLimiter {
   private config: RateLimitConfig = {
-    FREE_DAILY: 3,
+    FREE_DAILY: 5,
     SESSION_KEY: 'wedai_usage',
     RESET_HOUR: 0 // midnight
   };
+
+  // Display limit for UI (shows 3 to users while internal limit is 5)
+  public readonly DISPLAY_LIMIT = 3;
 
   /**
    * Get current date in YYYY-MM-DD format for tracking

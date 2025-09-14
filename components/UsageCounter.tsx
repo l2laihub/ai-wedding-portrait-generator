@@ -77,11 +77,13 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
 
   // Determine display values based on user type
   const isAuthenticated = !!user;
-  const remaining = isAuthenticated ? creditBalance?.totalAvailable || 0 : limitInfo?.remaining || 0;
-  const total = isAuthenticated ? creditBalance?.totalAvailable || 0 : limitInfo?.total || 0;
+  const displayLimit = 5; // Show 5 to users even though internal limit is 5
+  
+  const remaining = isAuthenticated ? creditBalance?.totalAvailable || 0 : Math.min(limitInfo?.remaining || 0, displayLimit);
+  const total = isAuthenticated ? creditBalance?.totalAvailable || 0 : displayLimit;
   const used = isAuthenticated ? 
     (creditBalance?.freeCreditsUsed || 0) : 
-    (limitInfo?.total || 0) - (limitInfo?.remaining || 0);
+    Math.min((limitInfo?.total || 0) - (limitInfo?.remaining || 0), displayLimit);
 
   const getStatusColor = () => {
     if (remaining === 0) return 'text-red-600 dark:text-red-400';
@@ -97,7 +99,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
 
   const progressPercentage = isAuthenticated ? 
     (total > 0 ? Math.round(((total - remaining) / total) * 100) : 0) :
-    Math.round(((limitInfo?.total || 0) - (limitInfo?.remaining || 0)) / (limitInfo?.total || 1) * 100);
+    Math.round(used / displayLimit * 100);
 
   if (variant === 'compact') {
     return (
@@ -110,13 +112,13 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           {isAuthenticated ? (
             creditBalance?.totalAvailable ? (
               creditBalance.freeCreditsRemaining > 0 ? 
-                `${creditBalance.freeCreditsRemaining}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} credits` :
+                `${Math.min(creditBalance.freeCreditsRemaining, displayLimit)}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} credits` :
                 `${creditBalance.totalAvailable} credits available`
             ) : (
               '0 credits remaining'
             )
           ) : (
-            `${limitInfo?.remaining}/${limitInfo?.total} free portraits today`
+            `${remaining}/${displayLimit} free portraits today`
           )}
         </span>
         {showTimeUntilReset && remaining === 0 && (
@@ -143,7 +145,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
         <span className={`text-lg font-bold ${getStatusColor()}`}>
           {isAuthenticated ? 
             `${creditBalance?.totalAvailable || 0} credits` :
-            `${limitInfo?.remaining}/${limitInfo?.total}`
+            `${remaining}/${displayLimit}`
           }
         </span>
       </div>
@@ -168,7 +170,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           creditBalance?.totalAvailable && creditBalance.totalAvailable > 0 ? (
             <div className="space-y-1">
               {creditBalance.freeCreditsRemaining > 0 && (
-                <div>Free today: <strong className={getStatusColor()}>{creditBalance.freeCreditsRemaining}/3</strong></div>
+                <div>Free today: <strong className={getStatusColor()}>{Math.min(creditBalance.freeCreditsRemaining, displayLimit)}/3</strong></div>
               )}
               {creditBalance.paidCredits > 0 && (
                 <div>Purchased: <strong className="text-blue-600 dark:text-blue-400">{creditBalance.paidCredits}</strong></div>

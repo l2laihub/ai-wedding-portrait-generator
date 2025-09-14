@@ -43,7 +43,8 @@ export interface ConsumeResult {
   error?: string;
 }
 
-const FREE_DAILY_LIMIT = 3;
+const FREE_DAILY_LIMIT = 5;
+const DISPLAY_DAILY_LIMIT = 3; // What we show to users
 
 class CreditsService {
   /**
