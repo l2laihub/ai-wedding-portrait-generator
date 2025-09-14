@@ -60,6 +60,7 @@ const SimpleHeader: React.FC = () => {
               <span>Privacy First</span>
             </div>
           </div>
+          
         </div>
       </div>
     </header>

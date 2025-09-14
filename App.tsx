@@ -3,6 +3,7 @@ import SimpleHeader from './components/SimpleHeader';
 import SimpleFooter from './components/SimpleFooter';
 import Loader from './components/Loader';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import RateLimitToast from './components/RateLimitToast';
 import { NetworkStatus, PerformanceMonitor } from './components/MobileEnhancements';
 import { useTheme } from './hooks/useTheme';
 import { 
@@ -271,6 +272,20 @@ function App({ navigate }: AppProps) {
           stylesToGenerate,
           customPrompt
         );
+        
+        // Check for errors in sequential mode
+        if (failedStyles.length > 0) {
+          const hasRateLimitError = finalContents.some(c => 
+            c.imageUrl === null && 
+            (c.text?.includes('quota') || c.text?.includes('limit') || c.text?.includes('popular today'))
+          );
+          
+          if (hasRateLimitError) {
+            setError(`Some portrait styles hit our daily limits, but ${successfulStyles.length} succeeded!`);
+          } else {
+            setError(`${failedStyles.length} of ${stylesToGenerate.length} styles could not be generated. ${successfulStyles.length} portraits are ready above!`);
+          }
+        }
       } else {
         // Generate all styles concurrently (original behavior)
         const generationPromises = stylesToGenerate.map(style => {
@@ -348,7 +363,21 @@ function App({ navigate }: AppProps) {
         );
 
         if (results.some(r => r.status === 'rejected')) {
-          setError("Some portrait styles could not be generated. Please check the console for details.");
+          const failedCount = results.filter(r => r.status === 'rejected').length;
+          const successCount = results.filter(r => r.status === 'fulfilled').length;
+          
+          // Check if failures are due to rate limiting
+          const hasRateLimitError = results.some(r => 
+            r.status === 'rejected' && 
+            r.reason instanceof Error && 
+            (r.reason.message.includes('quota') || r.reason.message.includes('limit') || r.reason.message.includes('popular today'))
+          );
+          
+          if (hasRateLimitError) {
+            setError(`Some portrait styles hit our daily limits, but ${successCount} succeeded!`);
+          } else {
+            setError(`${failedCount} of ${stylesToGenerate.length} styles could not be generated. ${successCount} portraits are ready above!`);
+          }
         }
       }
 
@@ -416,16 +445,51 @@ function App({ navigate }: AppProps) {
 
           {error && (
             <div className={`
-              text-center p-4 bg-red-50 dark:bg-red-900 border border-red-300 dark:border-red-700 
-              text-red-800 dark:text-red-300 rounded-lg mx-auto transition-colors duration-300
+              text-center p-4 rounded-lg mx-auto transition-colors duration-300
               ${isMobile ? 'max-w-full' : 'max-w-2xl'}
+              ${error.includes('Daily API limit') || error.includes('quota') || error.includes('popular today') 
+                ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200'
+                : 'bg-red-50 dark:bg-red-900 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-300'
+              }
             `}>
-              <p><strong>Oops! Something went wrong.</strong></p>
-              <p className={isMobile ? 'text-sm mt-1' : ''}>{error}</p>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                {error.includes('Daily API limit') || error.includes('quota') || error.includes('popular today') ? (
+                  <>
+                    <span className="text-lg">⏰</span>
+                    <strong>High Demand Alert</strong>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-lg">⚠️</span>
+                    <strong>Generation Issue</strong>
+                  </>
+                )}
+              </div>
+              
+              {error.includes('Some portrait styles could not be generated') ? (
+                <div>
+                  <p className={`${isMobile ? 'text-sm' : ''} mb-2`}>
+                    Some wedding styles hit our daily limits, but others succeeded! 
+                  </p>
+                  <p className={`text-xs ${isMobile ? 'text-xs' : 'text-sm'} opacity-75`}>
+                    💡 <strong>What you can do:</strong> Download the successful portraits above, or try again tomorrow when limits reset.
+                  </p>
+                </div>
+              ) : (
+                <p className={isMobile ? 'text-sm mt-1' : ''}>{error}</p>
+              )}
+              
               {!isOnline && (
                 <p className="text-xs mt-2 opacity-75">
-                  Check your internet connection and try again.
+                  📡 Check your internet connection and try again.
                 </p>
+              )}
+              
+              {(error.includes('Daily API limit') || error.includes('quota')) && (
+                <div className="mt-3 text-xs opacity-75">
+                  <p>🔄 Limits reset daily at midnight PT</p>
+                  <p>🚀 Your app's popularity is growing fast!</p>
+                </div>
               )}
             </div>
           )}
@@ -488,6 +552,9 @@ function App({ navigate }: AppProps) {
       
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
+      
+      {/* Rate Limit Toast */}
+      <RateLimitToast />
       
       {/* Performance Monitor (debug mode only) */}
       <PerformanceMonitor />

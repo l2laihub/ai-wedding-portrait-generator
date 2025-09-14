@@ -67,8 +67,34 @@ export const editImageWithNanoBanana = async (
     }
 
     return generatedContent;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error editing image:", error);
+    
+    // Handle specific API errors
+    if (error.message && typeof error.message === 'string') {
+      const errorMessage = error.message.toLowerCase();
+      
+      // Rate limit / quota exceeded
+      if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        throw new Error("⏰ Daily API limit reached! Our service is very popular today. Please try again tomorrow or check back later.");
+      }
+      
+      // Content safety
+      if (errorMessage.includes('unsafe') || errorMessage.includes('blocked')) {
+        throw new Error("🛡️ Content safety check: Please try with a different photo or ensure it shows people clearly.");
+      }
+      
+      // Network/connection issues
+      if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+        throw new Error("🌐 Connection issue: Please check your internet and try again.");
+      }
+    }
+    
+    // Handle structured error responses from API
+    if (error.error && error.error.code === 429) {
+      throw new Error("⏰ Daily API limit reached! Our AI wedding portrait service is very popular. Please try again tomorrow!");
+    }
+    
     if (error instanceof Error) {
         throw new Error(`Failed to generate image: ${error.message}`);
     }
