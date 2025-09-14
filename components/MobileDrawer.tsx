@@ -1,7 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { useHapticFeedback } from './MobileEnhancements';
+import { rateLimiter } from '../utils/rateLimiter';
+import { creditsService } from '../services/creditsService';
 import Icon from './Icon';
 
 interface MobileDrawerProps {
@@ -130,7 +132,7 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, navigate }
       id: 'help',
       label: 'Help & Support',
       icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
-      onClick: () => alert('Help & Support: Contact us at support@wedai.com')
+      onClick: () => alert('Help & Support: Contact us at huybuilds@gmail.com')
     },
     {
       id: 'privacy',
@@ -186,8 +188,12 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, navigate }
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-lg">W</span>
+            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center p-2">
+              <img 
+                src="/assets/wedai_logo_notext_nobg.png" 
+                alt="WedAI Logo" 
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex-1">
               <h2 className="font-bold text-gray-900 dark:text-white">WedAI</h2>
@@ -201,9 +207,7 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, navigate }
               <p className="text-sm font-medium text-gray-900 dark:text-white">
                 {user.email}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Free Account • 5 portraits left
-              </p>
+              <PortraitCounter user={user} />
             </div>
           )}
         </div>
@@ -248,6 +252,46 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, navigate }
         </div>
       </div>
     </>
+  );
+};
+
+// Portrait Counter Component
+const PortraitCounter: React.FC<{ user: any }> = ({ user }) => {
+  const [counterText, setCounterText] = useState('Loading...');
+
+  useEffect(() => {
+    const updateCounter = async () => {
+      try {
+        if (user) {
+          // For authenticated users, get credits info
+          const balance = await creditsService.getBalance();
+          setCounterText(`Account • ${balance.balance} credits`);
+        } else {
+          // For anonymous users, use rate limiter
+          const stats = rateLimiter.getUsageStats();
+          setCounterText(`Free Account • ${stats.remaining} portraits left`);
+        }
+      } catch (error) {
+        if (user) {
+          setCounterText('Account • Error loading credits');
+        } else {
+          const stats = rateLimiter.getUsageStats();
+          setCounterText(`Free Account • ${stats.remaining} portraits left`);
+        }
+      }
+    };
+
+    updateCounter();
+    
+    // Update counter every 10 seconds
+    const interval = setInterval(updateCounter, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  return (
+    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      {counterText}
+    </p>
   );
 };
 

@@ -109,8 +109,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
       {/* App Logo/Icon */}
       <div className="relative mb-8 animate-pulse">
         <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center shadow-2xl">
-          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center">
-            <span className="text-purple-600 font-bold text-2xl">W</span>
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center p-2">
+            <img 
+              src="/assets/wedai_logo_notext_nobg.png" 
+              alt="WedAI Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
         </div>
         

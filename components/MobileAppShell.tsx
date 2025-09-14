@@ -238,8 +238,12 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
               {!isOnline && (
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               )}
-              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">W</span>
+              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center p-2">
+                <img 
+                  src="/assets/wedai_logo_notext_nobg.png" 
+                  alt="WedAI Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </div>
           </div>

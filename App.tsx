@@ -126,71 +126,7 @@ function App({ navigate }: AppProps) {
   // const { flags: featureFlags } = useAppFeatureFlags();
   const featureFlags = { enable_sequential_generation: false };
 
-  // Mobile app initialization
-  const handleSplashComplete = () => {
-    setShowSplash(false);
-    setAppReady(true);
-  };
-
-  // Handle escape key for upgrade modal
-  useEffect(() => {
-    const handleEscapeKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showUpgradePrompt) {
-          setShowUpgradePrompt(false);
-        }
-      }
-    };
-
-    if (showUpgradePrompt) {
-      document.addEventListener('keydown', handleEscapeKey);
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.removeEventListener('keydown', handleEscapeKey);
-        document.body.style.overflow = 'unset';
-      };
-    }
-  }, [showUpgradePrompt]);
-
-  // Preload critical components on app mount and identify user
-  useEffect(() => {
-    preloadCriticalComponents();
-    
-    // Generate or retrieve user ID for analytics
-    let userId = localStorage.getItem('wedai_user_id');
-    if (!userId) {
-      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('wedai_user_id', userId);
-    }
-    
-    // Identify user in PostHog
-    posthogService.identify(userId, {
-      timestamp: Date.now(),
-      source: 'app_load',
-      userAgent: navigator.userAgent,
-      screenWidth: window.screen.width,
-      screenHeight: window.screen.height,
-      devicePixelRatio: window.devicePixelRatio,
-      language: navigator.language,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    });
-  }, []);
-
-  // Return mobile app experience for mobile devices - moved after all hooks
-  if (isMobile && !appReady) {
-    return (
-      <SplashScreen
-        onComplete={handleSplashComplete}
-        minDuration={2000}
-        showProgress={true}
-      />
-    );
-  }
-
-  if (isMobile && appReady) {
-    return <MobileApp navigate={navigate} />;
-  }
-
+  // Shared handler functions - defined after hooks
   const handleImageUpload = (file: File) => {
     setSourceImageFile(file);
     setSourceImageUrl(URL.createObjectURL(file));
@@ -204,51 +140,6 @@ function App({ navigate }: AppProps) {
     if (newPrompt.length > 0) {
       posthogService.trackPromptModified(newPrompt);
     }
-  };
-
-  // Helper method to increment counter with enhanced metadata
-  const incrementCounterWithMetadata = (
-    generationId: string,
-    successfulStyles: number,
-    totalStyles: number,
-    photoType: 'single' | 'couple' | 'family',
-    styles: string[],
-    customPrompt: string
-  ) => {
-    // First increment the counter normally
-    counterService.incrementCounter(generationId, successfulStyles, totalStyles, photoType);
-    
-    // Then enhance with additional PostHog metadata
-    posthogService.trackCounterIncrement({
-      generationId,
-      totalGenerations: counterService.getTotalGenerations(),
-      dailyGenerations: counterService.getDailyGenerations(),
-      successfulStyles,
-      totalStyles,
-      successRate: totalStyles > 0 ? successfulStyles / totalStyles : 0,
-      photoType,
-      familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
-      customPrompt: customPrompt.trim() || undefined,
-      styles,
-      timestamp: Date.now(),
-    });
-  };
-
-  // Authentication handlers
-  const handleLogin = (mode: 'signin' | 'signup' = 'signin') => {
-    setLoginMode(mode);
-    setShowLoginModal(true);
-  };
-
-  const handleLoginSuccess = (user: any) => {
-    console.log('User logged in:', user);
-    setShowLoginModal(false);
-    // Show a brief success message or update UI
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    setShowProfileModal(false);
   };
 
   const handleGenerate = async () => {
@@ -313,8 +204,6 @@ function App({ navigate }: AppProps) {
         customPrompt: customPrompt || undefined,
         generationId,
         timestamp: Date.now(),
-        photoType,
-        familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
       });
       
       // Track each style in database analytics
@@ -510,6 +399,161 @@ function App({ navigate }: AppProps) {
       setIsLoading(false);
     }
   };
+
+  // Helper method to increment counter with enhanced metadata
+  const incrementCounterWithMetadata = (
+    generationId: string,
+    successfulStyles: number,
+    totalStyles: number,
+    photoType: 'single' | 'couple' | 'family',
+    styles: string[],
+    customPrompt: string
+  ) => {
+    // First increment the counter normally
+    counterService.incrementCounter(generationId, successfulStyles, totalStyles, photoType);
+    
+    // Then enhance with additional PostHog metadata
+    posthogService.trackCounterIncrement({
+      generationId,
+      totalGenerations: counterService.getTotalGenerations(),
+      dailyGenerations: counterService.getDailyGenerations(),
+      successfulStyles,
+      totalStyles,
+      successRate: totalStyles > 0 ? successfulStyles / totalStyles : 0,
+      photoType,
+      familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
+      customPrompt: customPrompt.trim() || undefined,
+      styles,
+      timestamp: Date.now(),
+    });
+  };
+
+  // Authentication handlers
+  const handleLogin = (mode: 'signin' | 'signup' = 'signin') => {
+    setLoginMode(mode);
+    setShowLoginModal(true);
+  };
+
+  const handleLoginSuccess = (user: any) => {
+    console.log('User logged in:', user);
+    setShowLoginModal(false);
+    // Show a brief success message or update UI
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setShowProfileModal(false);
+  };
+
+  // Shared reset function for both desktop and mobile
+  const resetState = () => {
+    setSourceImageFile(null);
+    setSourceImageUrl(null);
+    setGeneratedContents(null);
+    setError(null);
+    setCurrentGenerationId(null);
+  };
+
+  // Mobile app initialization
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    setAppReady(true);
+  };
+
+  // Handle escape key for upgrade modal
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showUpgradePrompt) {
+          setShowUpgradePrompt(false);
+        }
+      }
+    };
+
+    if (showUpgradePrompt) {
+      document.addEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.removeEventListener('keydown', handleEscapeKey);
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [showUpgradePrompt]);
+
+  // Preload critical components on app mount and identify user
+  useEffect(() => {
+    preloadCriticalComponents();
+    
+    // Generate or retrieve user ID for analytics
+    let userId = localStorage.getItem('wedai_user_id');
+    if (!userId) {
+      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('wedai_user_id', userId);
+    }
+    
+    // Identify user in PostHog
+    posthogService.identify(userId, {
+      timestamp: Date.now(),
+      source: 'app_load',
+      userAgent: navigator.userAgent,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      devicePixelRatio: window.devicePixelRatio,
+      language: navigator.language,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  }, []);
+
+  // Return mobile app experience for mobile devices - moved after all hooks
+  if (isMobile && !appReady) {
+    return (
+      <SplashScreen
+        onComplete={handleSplashComplete}
+        minDuration={2000}
+        showProgress={true}
+      />
+    );
+  }
+
+  if (isMobile && appReady) {
+    return (
+      <MobileApp 
+        navigate={navigate}
+        // Shared state
+        sourceImageFile={sourceImageFile}
+        sourceImageUrl={sourceImageUrl}
+        generatedContents={generatedContents}
+        isLoading={isLoading}
+        error={error}
+        customPrompt={customPrompt}
+        currentGenerationId={currentGenerationId}
+        photoType={photoType}
+        familyMemberCount={familyMemberCount}
+        showLimitModal={showLimitModal}
+        showLoginModal={showLoginModal}
+        showProfileModal={showProfileModal}
+        loginMode={loginMode}
+        // Shared handlers
+        handleImageUpload={handleImageUpload}
+        handleGenerate={handleGenerate}
+        handleCustomPromptChange={handleCustomPromptChange}
+        setPhotoType={setPhotoType}
+        setFamilyMemberCount={setFamilyMemberCount}
+        setShowLimitModal={setShowLimitModal}
+        setShowLoginModal={setShowLoginModal}
+        setShowProfileModal={setShowProfileModal}
+        setLoginMode={setLoginMode}
+        // Mobile-specific props
+        stylesToGenerate={getRandomWeddingStyles()}
+        resetState={resetState}
+      />
+    );
+  }
+
+  
+
+
+
 
   const getMainClasses = () => {
     if (isMobile) {

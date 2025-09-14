@@ -8,9 +8,7 @@ import { useTheme } from '../hooks/useTheme';
 // Enhanced mobile components
 import MobileAppShell from './MobileAppShell';
 import SwipeableGallery from './SwipeableGallery';
-import FloatingActionButton from './FloatingActionButton';
 import { MobileToastManager, useMobileToasts } from './MobileToast';
-import BottomSheet from './BottomSheet';
 
 // Existing components with mobile optimizations
 import { 
@@ -40,9 +38,37 @@ import { posthogService } from '../services/posthogService';
 import { counterService } from '../services/counterService';
 import UsageCounter from './UsageCounter';
 import Loader from './Loader';
+import GenerationProgress from './GenerationProgress';
 
 interface MobileAppProps {
   navigate: (route: 'home' | 'privacy' | 'terms') => void;
+  // Shared state from App.tsx
+  sourceImageFile: File | null;
+  sourceImageUrl: string | null;
+  generatedContents: GeneratedContent[] | null;
+  isLoading: boolean;
+  error: string | null;
+  customPrompt: string;
+  currentGenerationId: string | null;
+  photoType: 'single' | 'couple' | 'family';
+  familyMemberCount: number;
+  showLimitModal: boolean;
+  showLoginModal: boolean;
+  showProfileModal: boolean;
+  loginMode: 'signin' | 'signup';
+  // Shared handlers from App.tsx
+  handleImageUpload: (file: File) => void;
+  handleGenerate: () => Promise<void>;
+  handleCustomPromptChange: (prompt: string) => void;
+  setPhotoType: (type: 'single' | 'couple' | 'family') => void;
+  setFamilyMemberCount: (count: number) => void;
+  setShowLimitModal: (show: boolean) => void;
+  setShowLoginModal: (show: boolean) => void;
+  setShowProfileModal: (show: boolean) => void;
+  setLoginMode: (mode: 'signin' | 'signup') => void;
+  // Additional mobile-specific props
+  stylesToGenerate?: string[];
+  resetState: () => void;
 }
 
 const ALL_WEDDING_STYLES = [
@@ -58,29 +84,38 @@ const ALL_WEDDING_STYLES = [
   "Winter Wonderland Wedding"
 ];
 
-const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
-  const [sourceImageFile, setSourceImageFile] = useState<File | null>(null);
-  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
-  const [generatedContents, setGeneratedContents] = useState<GeneratedContent[] | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [customPrompt, setCustomPrompt] = useState<string>('');
-  const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
-  const [photoType, setPhotoType] = useState<'single' | 'couple' | 'family'>('couple');
-  const [familyMemberCount, setFamilyMemberCount] = useState<number>(4);
-  
-  // Mobile-specific states
+const MobileApp: React.FC<MobileAppProps> = ({ 
+  navigate,
+  // Shared state from App.tsx
+  sourceImageFile,
+  sourceImageUrl,
+  generatedContents,
+  isLoading,
+  error,
+  customPrompt,
+  currentGenerationId,
+  photoType,
+  familyMemberCount,
+  showLimitModal,
+  showLoginModal,
+  showProfileModal,
+  loginMode,
+  // Shared handlers from App.tsx
+  handleImageUpload,
+  handleGenerate,
+  handleCustomPromptChange,
+  setPhotoType,
+  setFamilyMemberCount,
+  setShowLimitModal,
+  setShowLoginModal,
+  setShowProfileModal,
+  setLoginMode,
+  stylesToGenerate = [],
+  resetState
+}) => {
+  // Mobile-specific states only
   const [currentTab, setCurrentTab] = useState('home');
-  const [showUploadSheet, setShowUploadSheet] = useState(false);
-  const [showSettingsSheet, setShowSettingsSheet] = useState(false);
-  const [showPromptSheet, setShowPromptSheet] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Modal states
-  const [showLimitModal, setShowLimitModal] = useState<boolean>(false);
-  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
-  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
-  const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
 
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
@@ -88,7 +123,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
   const { user, isAuthenticated, signOut } = useAuth();
   
   // Check maintenance mode
-  const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+  const isMaintenanceMode = (import.meta.env as any).VITE_MAINTENANCE_MODE === 'true';
   const { 
     toasts, 
     showSuccess, 
@@ -113,156 +148,37 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
 
     setIsRefreshing(true);
     try {
-      // Clear current results
-      setGeneratedContents(null);
-      setError(null);
-      
       // Show success feedback
       showSuccess('Refreshed successfully');
       
       // If there's an image, trigger a new generation
       if (sourceImageFile) {
-        await handleGenerate();
+        await handleMobileGenerate();
       }
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Enhanced image upload handler
-  const handleImageUpload = (file: File) => {
-    setSourceImageFile(file);
-    setSourceImageUrl(URL.createObjectURL(file));
-    setGeneratedContents(null);
-    setError(null);
-    setShowUploadSheet(false);
-    
+  // Mobile upload handler wrapper
+  const handleMobileImageUpload = (file: File) => {
+    handleImageUpload(file);
     showSuccess('Image uploaded successfully!');
   };
 
-  // Handle generation with mobile optimizations
-  const handleGenerate = async () => {
-    if (!sourceImageFile) {
-      showError("Please upload an image first.");
-      return;
-    }
-
-    if (!isOnline) {
-      showError("Please check your internet connection.");
-      return;
-    }
-
-    // Check credits
-    let canProceed = true;
-    if (user) {
-      const balance = await creditsService.getBalance();
-      if (!balance.canUseCredits) {
-        setShowLimitModal(true);
-        return;
-      }
-    } else {
-      const limitCheck = rateLimiter.checkLimit();
-      if (!limitCheck.canProceed) {
-        setShowLimitModal(true);
-        return;
-      }
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setGeneratedContents(null);
-    setShowPromptSheet(false);
-
-    // Consume credit
-    if (user) {
-      const consumeResult = await creditsService.consumeCredit(`Portrait generation - ${photoType}`);
-      if (!consumeResult.success) {
-        showError(consumeResult.error || 'Failed to consume credit');
-        setIsLoading(false);
-        return;
-      }
-    } else {
-      rateLimiter.consumeCredit();
-    }
-
-    const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    setCurrentGenerationId(generationId);
-
+  // Mobile generate handler wrapper
+  const handleMobileGenerate = async () => {
     try {
-      const stylesToGenerate = getRandomWeddingStyles();
-      
-      posthogService.trackGenerationStarted(generationId, {
-        styles: stylesToGenerate,
-        customPrompt: customPrompt || undefined,
-        photoType,
-        familyMemberCount: photoType === 'family' ? familyMemberCount : undefined,
-      });
-
-      // Use sequential generation for mobile
-      const finalContents: GeneratedContent[] = [];
-      
-      for (let i = 0; i < stylesToGenerate.length; i++) {
-        const style = stylesToGenerate[i];
-        const prompt = photoType === 'couple' 
-          ? `Transform the couple into a beautiful wedding portrait with a "${style}" theme. Keep their faces EXACTLY identical. ${customPrompt}`
-          : `Transform into a wedding portrait with a "${style}" theme. Keep faces identical. ${customPrompt}`;
-
-        try {
-          const content = await editImageWithNanoBanana(sourceImageFile, prompt);
-          finalContents.push({ ...content, style });
-          
-          // Update UI with partial results
-          setGeneratedContents([...finalContents]);
-        } catch (err) {
-          console.error(`Error generating style "${style}":`, err);
-          finalContents.push({
-            imageUrl: null,
-            text: err instanceof Error ? err.message : 'Generation failed',
-            style,
-          });
-        }
+      await handleGenerate();
+      if (generatedContents && generatedContents.length > 0) {
+        showSuccess('Portraits generated successfully!');
       }
-
-      const successCount = finalContents.filter(c => c.imageUrl !== null).length;
-      
-      if (successCount > 0) {
-        showSuccess(`${successCount} portrait${successCount > 1 ? 's' : ''} generated successfully!`);
-      } else {
-        showError('All generations failed. Please try again.');
-      }
-
-      // Track completion
-      const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
-      const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
-      
-      posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
-      counterService.incrementCounter(generationId, successCount, stylesToGenerate.length, photoType);
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Generation failed";
-      showError(errorMessage);
-      posthogService.trackGenerationFailed(generationId, errorMessage);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      showError('Generation failed. Please try again.');
     }
   };
 
-  // Simplified FAB actions - only primary action
-  const fabActions = sourceImageUrl ? [
-    {
-      id: 'generate',
-      label: 'Generate Portraits',
-      icon: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
-      onClick: handleGenerate // Direct generation without bottom sheet
-    }
-  ] : [
-    {
-      id: 'upload',
-      label: 'Upload Photo',
-      icon: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z',
-      onClick: () => setShowUploadSheet(true)
-    }
-  ];
+  // Generation handler removed - using shared handler from App.tsx
 
   const handleTabChange = (tabId: string) => {
     setCurrentTab(tabId);
@@ -273,10 +189,16 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
           // Scroll to gallery
           const galleryElement = document.querySelector('.swipeable-gallery');
           galleryElement?.scrollIntoView({ behavior: 'smooth' });
+          showInfo('Viewing your generated portraits');
+        } else {
+          // No gallery content, show message and switch back to home
+          showInfo('No portraits generated yet. Create some portraits first!');
+          setCurrentTab('home');
         }
         break;
       case 'create':
-        setShowUploadSheet(true);
+        // Reset state to show upload UI
+        resetState();
         break;
       case 'profile':
         if (isAuthenticated) {
@@ -288,8 +210,10 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
     }
   };
 
-  // Loading states with skeletons
+  // Loading states with enhanced progress UI
   if (isLoading) {
+    const currentStyles = stylesToGenerate.length > 0 ? stylesToGenerate : getRandomWeddingStyles();
+    
     return (
       <MobileAppShell
         currentTab={currentTab}
@@ -302,6 +226,15 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
           <PhotoTypeSelectorSkeleton />
           <UsageCounterSkeleton />
           <ImageUploaderSkeleton />
+          
+          {/* Enhanced loading with progress */}
+          <GenerationProgress
+            styles={currentStyles}
+            currentIndex={0}
+            completedCount={0}
+            className="mb-4"
+          />
+          
           <Loader message="Creating your wedding portraits..." />
           <ImageDisplaySkeleton count={3} />
         </div>
@@ -339,7 +272,7 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
         {/* Image Upload Area - Only show if no image */}
         {!sourceImageUrl && (
           <SuspenseImageUploader 
-            onImageUpload={handleImageUpload}
+            onImageUpload={handleMobileImageUpload}
             sourceImageUrl={sourceImageUrl}
           />
         )}
@@ -355,16 +288,27 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
                 className="w-full max-h-64 object-contain rounded-lg"
               />
               <button
-                onClick={() => setShowUploadSheet(true)}
+                onClick={resetState}
                 className="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-full"
+                title="Upload new photo"
               >
-                ✏️
+                🔄
               </button>
+            </div>
+            
+            {/* Custom Prompt Input */}
+            <div className="mb-4">
+              <SuspensePromptInput
+                onSubmit={handleMobileGenerate}
+                isLoading={isLoading}
+                customPrompt={customPrompt}
+                onCustomPromptChange={handleCustomPromptChange}
+              />
             </div>
             
             {/* Direct Generate Button */}
             <button
-              onClick={handleGenerate}
+              onClick={handleMobileGenerate}
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
             >
@@ -376,11 +320,21 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
 
         {/* Generated Results */}
         {generatedContents && (
-          <div className="swipeable-gallery">
+          <div className="space-y-4">
             <SwipeableGallery
               contents={generatedContents}
               generationId={currentGenerationId}
             />
+            
+            {/* New Image Button */}
+            <div className="text-center">
+              <button
+                onClick={resetState}
+                className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                📸 Upload New Photo
+              </button>
+            </div>
           </div>
         )}
 
@@ -428,42 +382,9 @@ const MobileApp: React.FC<MobileAppProps> = ({ navigate }) => {
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <FloatingActionButton actions={fabActions} />
+      {/* FloatingActionButton removed - using inline generate button instead */}
 
-      {/* Bottom Sheets */}
-      
-      {/* Upload Sheet */}
-      <BottomSheet
-        isOpen={showUploadSheet && !isMaintenanceMode}
-        onClose={() => setShowUploadSheet(false)}
-        title="Upload Your Photo"
-        snapPoints={[70, 90]}
-      >
-        <div className="p-4">
-          <SuspenseImageUploader 
-            onImageUpload={handleImageUpload}
-            sourceImageUrl={sourceImageUrl}
-          />
-        </div>
-      </BottomSheet>
-
-      {/* Prompt Sheet */}
-      <BottomSheet
-        isOpen={showPromptSheet && !isMaintenanceMode}
-        onClose={() => setShowPromptSheet(false)}
-        title="Generate Portraits"
-        snapPoints={[60, 80]}
-      >
-        <div className="p-4">
-          <SuspensePromptInput
-            onSubmit={handleGenerate}
-            isLoading={isLoading}
-            customPrompt={customPrompt}
-            onCustomPromptChange={setCustomPrompt}
-          />
-        </div>
-      </BottomSheet>
+      {/* Bottom Sheets removed - using inline UI for simpler mobile experience */}
 
       {/* Modals */}
       <LimitReachedModal 

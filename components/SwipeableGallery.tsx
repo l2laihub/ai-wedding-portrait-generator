@@ -75,6 +75,9 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!startX.current || e.touches.length !== 1) return;
     
+    // Prevent default to avoid scrolling
+    e.preventDefault();
+    
     const currentX = e.touches[0].clientX;
     const diffX = currentX - startX.current;
     
@@ -134,7 +137,7 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
     if (!container) return;
 
     container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    container.addEventListener('touchmove', handleTouchMove, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false }); // Non-passive to allow preventDefault
     container.addEventListener('touchend', handleTouchEnd);
     container.addEventListener('touchcancel', handleTouchEnd);
 
@@ -205,7 +208,11 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
       <div 
         ref={containerRef}
         className="relative w-full overflow-hidden bg-gray-900 rounded-xl"
-        style={{ height: '70vh', maxHeight: '600px' }}
+        style={{ 
+          height: '70vh', 
+          maxHeight: '600px',
+          touchAction: 'pan-x' // Allow horizontal panning for swipe
+        }}
         onClick={handleImageTap}
       >
         {/* Images Track */}
@@ -376,12 +383,19 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
       </div>
 
       {/* Instructions */}
-      <p className="text-center text-gray-500 dark:text-gray-400 text-sm mt-3">
-        {contents.length > 1 
-          ? 'Swipe left or right to browse • Tap to show actions'
-          : 'Tap image to show actions'
-        }
-      </p>
+      <div className="text-center mt-3">
+        <p className="text-gray-500 dark:text-gray-400 text-sm">
+          {contents.length > 1 
+            ? 'Swipe left or right to browse • Tap to show actions'
+            : 'Tap image to show actions'
+          }
+        </p>
+        {contents.length > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <span className="text-xs text-gray-400">Image {currentIndex + 1} of {contents.length}</span>
+          </div>
+        )}
+      </div>
 
       {/* Full Screen Preview */}
       {currentContent.imageUrl && (
