@@ -20,8 +20,11 @@ const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }>
 
 export const editImageWithNanoBanana = async (
   imageFile: File,
-  prompt: string
+  prompt: string,
+  retryCount: number = 0
 ): Promise<GeneratedContent> => {
+  const maxRetries = 2;
+  
   try {
     const { base64, mimeType } = await fileToBase64(imageFile);
 
@@ -68,36 +71,59 @@ export const editImageWithNanoBanana = async (
 
     return generatedContent;
   } catch (error: any) {
-    console.error("Error editing image:", error);
+    console.error(`Error editing image (attempt ${retryCount + 1}):`, error);
     
-    // Handle specific API errors
-    if (error.message && typeof error.message === 'string') {
-      const errorMessage = error.message.toLowerCase();
-      
-      // Rate limit / quota exceeded
-      if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
-        throw new Error("⏰ Daily API limit reached! Our service is very popular today. Please try again tomorrow or check back later.");
+    // Extract error details for better handling
+    let errorCode = null;
+    let errorMessage = '';
+    
+    // Handle structured API error responses
+    if (error.error) {
+      errorCode = error.error.code;
+      errorMessage = error.error.message || '';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    const lowerErrorMessage = errorMessage.toLowerCase();
+    
+    // Handle different types of errors
+    if (errorCode === 429 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('rate limit')) {
+      throw new Error("⏰ Daily API limit reached! Our service is very popular today. Please try again tomorrow or check back later.");
+    }
+    
+    if (lowerErrorMessage.includes('unsafe') || lowerErrorMessage.includes('blocked')) {
+      throw new Error("🛡️ Content safety check: Please try with a different photo or ensure it shows people clearly.");
+    }
+    
+    // Handle 500 Internal Server Errors with retry logic
+    if (errorCode === 500 || lowerErrorMessage.includes('internal error')) {
+      if (retryCount < maxRetries) {
+        console.log(`Retrying due to internal server error (attempt ${retryCount + 1}/${maxRetries})`);
+        // Wait briefly before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+        return editImageWithNanoBanana(imageFile, prompt, retryCount + 1);
+      } else {
+        throw new Error("🔄 Server temporarily unavailable. The AI service is experiencing high demand. Please try again in a few moments.");
       }
-      
-      // Content safety
-      if (errorMessage.includes('unsafe') || errorMessage.includes('blocked')) {
-        throw new Error("🛡️ Content safety check: Please try with a different photo or ensure it shows people clearly.");
-      }
-      
-      // Network/connection issues
-      if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+    }
+    
+    // Network/connection issues
+    if (lowerErrorMessage.includes('network') || lowerErrorMessage.includes('timeout') || lowerErrorMessage.includes('connection')) {
+      if (retryCount < maxRetries) {
+        console.log(`Retrying due to network issue (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        return editImageWithNanoBanana(imageFile, prompt, retryCount + 1);
+      } else {
         throw new Error("🌐 Connection issue: Please check your internet and try again.");
       }
     }
     
-    // Handle structured error responses from API
-    if (error.error && error.error.code === 429) {
-      throw new Error("⏰ Daily API limit reached! Our AI wedding portrait service is very popular. Please try again tomorrow!");
+    // For other errors, provide more informative message
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate image: ${error.message}`);
     }
     
-    if (error instanceof Error) {
-        throw new Error(`Failed to generate image: ${error.message}`);
-    }
     throw new Error("An unknown error occurred during image generation.");
   }
 };

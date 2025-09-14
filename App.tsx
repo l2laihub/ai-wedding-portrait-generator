@@ -286,10 +286,17 @@ function App({ navigate }: AppProps) {
             (c.text?.includes('quota') || c.text?.includes('limit') || c.text?.includes('popular today'))
           );
           
+          const hasServerError = finalContents.some(c => 
+            c.imageUrl === null && 
+            (c.text?.includes('Server temporarily unavailable') || c.text?.includes('internal error'))
+          );
+          
           if (hasRateLimitError) {
-            setError(`Some portrait styles hit our daily limits, but ${successfulStyles.length} succeeded!`);
+            setError(`Some portrait styles hit our daily limits, but ${successfulStyles.length} succeeded! 🎆`);
+          } else if (hasServerError) {
+            setError(`${successfulStyles.length} portraits generated successfully! ${failedStyles.length} styles experienced server issues but you can try regenerating them. 🔄`);
           } else {
-            setError(`${failedStyles.length} of ${stylesToGenerate.length} styles could not be generated. ${successfulStyles.length} portraits are ready above!`);
+            setError(`${successfulStyles.length} portraits are ready! ${failedStyles.length} styles encountered issues - try adjusting your prompt or photo. ✨`);
           }
         }
       } else {
@@ -379,10 +386,19 @@ function App({ navigate }: AppProps) {
             (r.reason.message.includes('quota') || r.reason.message.includes('limit') || r.reason.message.includes('popular today'))
           );
           
+          // Check if failures are due to server errors
+          const hasServerError = results.some(r => 
+            r.status === 'rejected' && 
+            r.reason instanceof Error && 
+            (r.reason.message.includes('Server temporarily unavailable') || r.reason.message.includes('internal error'))
+          );
+          
           if (hasRateLimitError) {
-            setError(`Some portrait styles hit our daily limits, but ${successCount} succeeded!`);
+            setError(`Some portrait styles hit our daily limits, but ${successCount} succeeded! 🎆`);
+          } else if (hasServerError) {
+            setError(`${successCount} portraits generated successfully! ${failedCount} styles experienced server issues - you can try regenerating for different styles. 🔄`);
           } else {
-            setError(`${failedCount} of ${stylesToGenerate.length} styles could not be generated. ${successCount} portraits are ready above!`);
+            setError(`${successCount} portraits are ready! ${failedCount} styles encountered issues - try adjusting your prompt or photo for better results. ✨`);
           }
         }
       }
