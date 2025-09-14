@@ -68,6 +68,11 @@ interface MobileAppProps {
   setLoginMode: (mode: 'signin' | 'signup') => void;
   // Additional mobile-specific props
   stylesToGenerate?: string[];
+  generationProgress?: Array<{
+    style: string;
+    status: 'waiting' | 'in_progress' | 'completed' | 'failed';
+    startTime?: number;
+  }>;
   resetState: () => void;
 }
 
@@ -111,6 +116,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
   setShowProfileModal,
   setLoginMode,
   stylesToGenerate = [],
+  generationProgress = [],
   resetState
 }) => {
   // Mobile-specific states only
@@ -240,6 +246,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
             styles={currentStyles}
             currentIndex={0}
             completedCount={0}
+            progressData={generationProgress.length > 0 ? generationProgress : undefined}
             className="w-full max-w-md"
           />
         </div>

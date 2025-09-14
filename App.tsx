@@ -117,6 +117,12 @@ function App({ navigate }: AppProps) {
   const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [appReady, setAppReady] = useState<boolean>(false);
+  // Real-time generation progress tracking
+  const [generationProgress, setGenerationProgress] = useState<Array<{
+    style: string;
+    status: 'waiting' | 'in_progress' | 'completed' | 'failed';
+    startTime?: number;
+  }>>([]);
   
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
@@ -174,6 +180,14 @@ function App({ navigate }: AppProps) {
     setIsLoading(true);
     setError(null);
     setGeneratedContents(null);
+    
+    // Initialize progress tracking
+    const stylesToGenerate = getRandomWeddingStyles();
+    const initialProgress = stylesToGenerate.map(style => ({
+      style,
+      status: 'waiting' as const
+    }));
+    setGenerationProgress(initialProgress);
 
     // Consume a credit for this generation
     let creditConsumed = false;
@@ -195,8 +209,6 @@ function App({ navigate }: AppProps) {
     setCurrentGenerationId(generationId);
 
     try {
-      // Get 3 random wedding styles for this generation
-      const stylesToGenerate = getRandomWeddingStyles();
       
       // Track generation started
       posthogService.trackGenerationStarted(generationId, {
@@ -219,6 +231,14 @@ function App({ navigate }: AppProps) {
         const finalContents: GeneratedContent[] = [];
         for (let i = 0; i < stylesToGenerate.length; i++) {
           const style = stylesToGenerate[i];
+          
+          // Update progress: mark current style as in progress
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === style 
+              ? { ...p, status: 'in_progress', startTime: Date.now() }
+              : p
+          ));
+          
           // image prompts are long, so we track each style generation separately
           const prompt = photoType === 'single'
             ? `Transform the person into a FULL BODY wedding portrait with a "${style}" theme. Create a professional bridal/groom portrait showing them in ${getStylePose(style)}. Keep their face EXACTLY identical to the original - preserve ALL facial features, expressions, and complete likeness. Show the complete wedding outfit from head to toe, including dress/suit details, shoes, and accessories. The subject should be in a flattering, professional modeling pose appropriate for the wedding style. ${customPrompt}. Ensure their face remains perfectly consistent and unchanged from the original photo while creating a stunning full-length portrait.`
@@ -230,6 +250,13 @@ function App({ navigate }: AppProps) {
             const styleStartTime = Date.now();
             const content = await editImageWithNanoBanana(sourceImageFile, prompt);
             const styleDuration = Date.now() - styleStartTime;
+            
+            // Update progress: mark as completed
+            setGenerationProgress(prev => prev.map(p => 
+              p.style === style 
+                ? { ...p, status: 'completed' }
+                : p
+            ));
             
             // Track successful style generation
             posthogService.trackStyleGenerated({
@@ -243,6 +270,13 @@ function App({ navigate }: AppProps) {
           } catch (err) {
             const styleDuration = Date.now() - (Date.now() - 1000); // Approximate
             console.error(`Error generating style "${style}":`, err);
+            
+            // Update progress: mark as failed
+            setGenerationProgress(prev => prev.map(p => 
+              p.style === style 
+                ? { ...p, status: 'failed' }
+                : p
+            ));
             
             // Track failed style generation
             posthogService.trackStyleGenerated({
@@ -301,6 +335,13 @@ function App({ navigate }: AppProps) {
         }
       } else {
         // Generate all styles concurrently (original behavior)
+        // Mark all styles as in progress at the start
+        setGenerationProgress(prev => prev.map(p => ({
+          ...p, 
+          status: 'in_progress' as const, 
+          startTime: Date.now()
+        })));
+        
         const generationPromises = stylesToGenerate.map(style => {
           const styleStartTime = Date.now();
           const prompt = photoType === 'single'
@@ -312,6 +353,13 @@ function App({ navigate }: AppProps) {
           return editImageWithNanoBanana(sourceImageFile, prompt)
             .then(content => {
               const styleDuration = Date.now() - styleStartTime;
+              
+              // Update progress: mark as completed
+              setGenerationProgress(prev => prev.map(p => 
+                p.style === style 
+                  ? { ...p, status: 'completed' }
+                  : p
+              ));
               
               // Track successful style generation
               posthogService.trackStyleGenerated({
@@ -325,6 +373,13 @@ function App({ navigate }: AppProps) {
             })
             .catch(err => {
               const styleDuration = Date.now() - styleStartTime;
+              
+              // Update progress: mark as failed
+              setGenerationProgress(prev => prev.map(p => 
+                p.style === style 
+                  ? { ...p, status: 'failed' }
+                  : p
+              ));
               
               // Track failed style generation
               posthogService.trackStyleGenerated({
@@ -468,6 +523,7 @@ function App({ navigate }: AppProps) {
     setGeneratedContents(null);
     setError(null);
     setCurrentGenerationId(null);
+    setGenerationProgress([]);
   };
 
   // Mobile app initialization
@@ -561,6 +617,7 @@ function App({ navigate }: AppProps) {
         setLoginMode={setLoginMode}
         // Mobile-specific props
         stylesToGenerate={getRandomWeddingStyles()}
+        generationProgress={generationProgress}
         resetState={resetState}
       />
     );
