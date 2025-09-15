@@ -40,51 +40,36 @@ export const useAuth = (): UseAuthReturn => {
       try {
         setIsLoading(true);
         
-        // Set a maximum timeout for auth initialization
-        const timeoutPromise = new Promise<void>((_, reject) => 
-          setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
-        );
+        // Check for existing session with better error handling
+        const session = await authService.getStoredSession();
         
-        const authPromise = (async () => {
-          // Check for existing session
-          const session = await authService.getStoredSession();
-          
-          if (mounted) {
-            if (session?.user) {
-              // Check immediately first
-              const currentUser = authService.getCurrentUser();
-              if (currentUser) {
-                setUser(currentUser);
-                return;
-              }
-              
-              // If not available immediately, wait for it to load
-              let retryCount = 0;
-              const maxRetries = 3;
-              
-              while (retryCount < maxRetries && mounted) {
-                await new Promise(resolve => setTimeout(resolve, 300));
-                const currentUser = authService.getCurrentUser();
-                if (currentUser) {
-                  setUser(currentUser);
-                  return;
-                }
-                retryCount++;
-              }
-              
-              console.warn('User profile not loaded yet, but session exists - this may indicate a database issue');
-              setUser(null);
+        if (mounted) {
+          if (session?.user) {
+            // Try to get current user from auth service
+            const currentUser = authService.getCurrentUser();
+            if (currentUser) {
+              console.log('Auth initialized successfully with user:', currentUser.email);
+              setUser(currentUser);
             } else {
-              setUser(null);
+              // If authService doesn't have the user yet, create a fallback user from session
+              // This prevents infinite loading when profile loading fails
+              console.log('AuthService user not ready, using session data as fallback');
+              const fallbackUser = {
+                id: session.user.id,
+                email: session.user.email || '',
+                displayName: session.user.user_metadata?.display_name || '',
+                createdAt: session.user.created_at || new Date().toISOString(),
+                referralCode: undefined
+              };
+              setUser(fallbackUser);
             }
+          } else {
+            setUser(null);
           }
-        })();
-        
-        // Race between auth loading and timeout
-        await Promise.race([authPromise, timeoutPromise]);
+        }
         
       } catch (error) {
-        console.error('Auth initialization failed or timed out:', error);
+        console.error('Auth initialization error:', error);
         if (mounted) {
           setUser(null);
         }
@@ -117,7 +102,7 @@ export const useAuth = (): UseAuthReturn => {
           setUser(currentUser);
         }
       }
-    }, 2000); // Check every 2 seconds
+    }, 1000); // Check every 1 second (more responsive)
 
     return () => {
       mounted = false;

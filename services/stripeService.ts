@@ -13,7 +13,7 @@ let stripePromise: Promise<StripeJS | null> | null = null;
 
 const getStripe = () => {
   if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+    stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
   }
   return stripePromise;
 };
@@ -51,7 +51,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'Launch price - Perfect for trying out our AI portraits',
     credits: 10,
     price: 499, // $4.99
-    priceId: 'price_1QSxxxxxxxxxxx', // Replace with actual Stripe price ID
+    priceId: 'price_1S7S5jBMCTqpTWpd2zgC1IPm',
     features: [
       '10 AI portrait credits',
       'All 12 wedding themes available',
@@ -65,7 +65,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'Most popular choice for couples',
     credits: 25,
     price: 999, // $9.99
-    priceId: 'price_1QSyxxxxxxxxxx', // Replace with actual Stripe price ID
+    priceId: 'price_1S7S6gBMCTqpTWpdAPUdabYB',
     popular: true,
     features: [
       '25 AI portrait credits',
@@ -82,7 +82,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'Best value for large celebrations',
     credits: 75,
     price: 2499, // $24.99
-    priceId: 'price_1QSzxxxxxxxxxx', // Replace with actual Stripe price ID
+    priceId: 'price_1S7S87BMCTqpTWpdtNWuNtjy',
     bestValue: true,
     features: [
       '75 AI portrait credits',
@@ -106,7 +106,7 @@ class StripeService {
   async isAvailable(): Promise<boolean> {
     try {
       const stripe = await getStripe();
-      return !!stripe && !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      return !!stripe && !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
     } catch (error) {
       console.error('Stripe availability check failed:', error);
       return false;

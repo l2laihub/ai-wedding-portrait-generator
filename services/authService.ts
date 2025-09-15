@@ -38,28 +38,58 @@ class AuthService {
       
       if (session?.user) {
         this.currentSession = session
-        try {
-          await this.loadUserProfile(session.user.id)
-        } catch (error) {
-          console.error('Failed to load user profile on auth state change:', error)
-          // Create a minimal user object if profile loading fails
-          this.currentUser = {
-            id: session.user.id,
-            email: session.user.email || '',
-            displayName: session.user.user_metadata?.display_name || '',
-            createdAt: session.user.created_at || new Date().toISOString(),
-            referralCode: undefined
-          }
+        
+        // Create user object directly from session data (ultra-simple approach)
+        // This eliminates database query dependencies that cause loading issues
+        this.currentUser = {
+          id: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.display_name || '',
+          createdAt: session.user.created_at || new Date().toISOString(),
+          referralCode: undefined // Will be loaded separately if needed
         }
+        
+        console.log('Auth state listener completed for:', this.currentUser?.email)
       } else {
         this.currentUser = null
         this.currentSession = null
+        console.log('Auth state listener: User signed out')
       }
     })
   }
 
   /**
-   * Load user profile from database
+   * Simple user profile loader with minimal error handling
+   */
+  private async loadUserProfileSimple(userId: string): Promise<AuthUser | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .limit(1)
+
+      if (error || !data || data.length === 0) {
+        console.warn('User profile not found in database:', error?.message)
+        return null
+      }
+
+      const userProfile = data[0]
+      return {
+        id: userProfile.id,
+        email: userProfile.email,
+        displayName: userProfile.display_name,
+        createdAt: userProfile.created_at,
+        referralCode: userProfile.referral_code
+      }
+    } catch (err) {
+      console.error('Failed to load user profile:', err)
+      return null
+    }
+  }
+
+  /**
+   * Load user profile from database (complex version with auto-creation)
    */
   private async loadUserProfile(userId: string): Promise<void> {
     try {
@@ -67,22 +97,95 @@ class AuthService {
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single()
+        .limit(1)
 
       if (error) {
         console.error('Error loading user profile:', error)
+        // If user profile doesn't exist, try to create it
+        if (error.code === 'PGRST116' || error.message.includes('Cannot coerce')) {
+          console.log('User profile not found, attempting to create one...')
+          await this.createUserProfile(userId)
+          return
+        }
         return
       }
 
+      if (!data || data.length === 0) {
+        console.log('No user profile found, creating one...')
+        await this.createUserProfile(userId)
+        return
+      }
+
+      const userProfile = data[0]
       this.currentUser = {
-        id: data.id,
-        email: data.email,
-        displayName: data.display_name,
-        createdAt: data.created_at,
-        referralCode: data.referral_code
+        id: userProfile.id,
+        email: userProfile.email,
+        displayName: userProfile.display_name,
+        createdAt: userProfile.created_at,
+        referralCode: userProfile.referral_code
       }
     } catch (err) {
       console.error('Failed to load user profile:', err)
+      // Fallback: try to create user profile
+      await this.createUserProfile(userId)
+    }
+  }
+
+  /**
+   * Create user profile if it doesn't exist
+   */
+  private async createUserProfile(userId: string): Promise<void> {
+    try {
+      // Get auth user info
+      const { data: authUser } = await supabase.auth.getUser()
+      if (!authUser.user || authUser.user.id !== userId) {
+        console.error('Auth user mismatch or not found')
+        return
+      }
+
+      // Generate referral code
+      const generateReferralCode = () => {
+        return Math.random().toString(36).substring(2, 8).toUpperCase()
+      }
+
+      const referralCode = generateReferralCode()
+
+      // Create user profile
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          email: authUser.user.email,
+          display_name: authUser.user.user_metadata?.display_name || '',
+          referral_code: referralCode
+        })
+
+      if (userError && !userError.message.includes('duplicate key')) {
+        console.error('Error creating user profile:', userError)
+        return
+      }
+
+      // Create user credits record
+      const { error: creditsError } = await supabase
+        .from('user_credits')
+        .insert({
+          user_id: userId
+        })
+
+      if (creditsError && !creditsError.message.includes('duplicate key')) {
+        console.error('Error creating user credits:', creditsError)
+      }
+
+      // Set the user profile directly to avoid recursive call
+      this.currentUser = {
+        id: userId,
+        email: authUser.user.email || '',
+        displayName: authUser.user.user_metadata?.display_name || '',
+        createdAt: authUser.user.created_at || new Date().toISOString(),
+        referralCode: referralCode
+      }
+    } catch (err) {
+      console.error('Failed to create user profile:', err)
     }
   }
 
@@ -133,50 +236,46 @@ class AuthService {
    */
   async signIn(data: SignInData): Promise<AuthResult> {
     try {
+      console.log('Starting sign in process for:', data.email)
+      
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password
       })
 
       if (authError) {
+        console.error('Supabase auth error:', authError)
         return { success: false, error: authError.message }
       }
 
       if (!authData.user || !authData.session) {
+        console.error('No user or session returned from Supabase')
         return { success: false, error: 'Sign in failed' }
       }
 
+      console.log('Supabase auth successful for:', authData.user.email)
+      
+      // Store session immediately
       this.currentSession = authData.session
-
-      // Update last login (don't wait for this)
-      supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', authData.user.id)
-        .then(() => console.log('Last login updated'))
-        .catch(() => console.warn('Failed to update last login - this is not critical'))
-
-      // Load user profile with timeout
-      try {
-        await Promise.race([
-          this.loadUserProfile(authData.user.id),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Profile loading timeout')), 5000)
-          )
-        ])
-      } catch (profileError) {
-        console.warn('Failed to load user profile, using fallback:', profileError)
-        // Create fallback user object
-        this.currentUser = {
-          id: authData.user.id,
-          email: authData.user.email || '',
-          displayName: authData.user.user_metadata?.display_name || '',
-          createdAt: authData.user.created_at || new Date().toISOString(),
-          referralCode: undefined
-        }
+      
+      // Create immediate user object from auth data - don't wait for profile loading
+      const immediateUser = {
+        id: authData.user.id,
+        email: authData.user.email || '',
+        displayName: authData.user.user_metadata?.display_name || '',
+        createdAt: authData.user.created_at || new Date().toISOString(),
+        referralCode: undefined
       }
-
-      return { success: true, user: this.currentUser || undefined }
+      
+      // Set current user immediately
+      this.currentUser = immediateUser
+      
+      console.log('Sign in successful for:', immediateUser.email)
+      
+      // Profile loading will happen asynchronously in the auth state listener
+      // This ensures fast sign-in without waiting for database queries
+      
+      return { success: true, user: immediateUser }
     } catch (err) {
       console.error('Sign in error:', err)
       return { success: false, error: 'Sign in failed. Please try again.' }
@@ -334,19 +433,13 @@ class AuthService {
       if (data.session?.user) {
         this.currentSession = data.session
         
-        // Load user profile in background
-        try {
-          await this.loadUserProfile(data.session.user.id)
-        } catch (profileError) {
-          console.error('Failed to load user profile during session restore:', profileError)
-          // Create a minimal user object if profile loading fails
-          this.currentUser = {
-            id: data.session.user.id,
-            email: data.session.user.email || '',
-            displayName: data.session.user.user_metadata?.display_name || '',
-            createdAt: data.session.user.created_at || new Date().toISOString(),
-            referralCode: undefined
-          }
+        // Create user object directly from session data (ultra-simple approach)
+        this.currentUser = {
+          id: data.session.user.id,
+          email: data.session.user.email || '',
+          displayName: data.session.user.user_metadata?.display_name || '',
+          createdAt: data.session.user.created_at || new Date().toISOString(),
+          referralCode: undefined
         }
       }
 

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Icon from './Icon';
+import { useAuth } from '../hooks/useAuth';
 
 interface UpgradePromptProps {
   variant?: 'banner' | 'card' | 'compact';
@@ -7,6 +8,7 @@ interface UpgradePromptProps {
   onJoinWaitlist?: () => void;
   showClose?: boolean;
   onClose?: () => void;
+  onShowPricing?: () => void;
 }
 
 const UpgradePrompt: React.FC<UpgradePromptProps> = ({
@@ -14,8 +16,97 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
   className = '',
   onJoinWaitlist,
   showClose = false,
-  onClose
+  onClose,
+  onShowPricing
 }) => {
+  const { user, isAuthenticated } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  // const pricingTiers = stripeService.getPricingTiers();
+  const pricingTiers = [
+    {
+      id: 'starter',
+      name: 'Starter',
+      description: 'Launch price - Perfect for trying out our AI portraits',
+      credits: 10,
+      price: 499,
+      priceId: 'price_1S7S5jBMCTqpTWpd2zgC1IPm',
+      popular: false,
+      bestValue: false,
+      features: ['10 AI portrait credits', 'All 12 wedding themes available']
+    },
+    {
+      id: 'wedding',
+      name: 'Wedding',
+      description: 'Most popular choice for couples',
+      credits: 25,
+      price: 999,
+      priceId: 'price_1S7S6gBMCTqpTWpdAPUdabYB',
+      popular: true,
+      bestValue: false,
+      features: ['25 AI portrait credits', 'All 12 premium wedding themes']
+    },
+    {
+      id: 'party',
+      name: 'Party',
+      description: 'Best value for large celebrations',
+      credits: 75,
+      price: 2499,
+      priceId: 'price_1S7S87BMCTqpTWpdtNWuNtjy',
+      popular: false,
+      bestValue: true,
+      features: ['75 AI portrait credits', 'All exclusive themes']
+    }
+  ];
+
+  const handlePurchase = async (priceId: string, planId: string) => {
+    if (!isAuthenticated || !user) {
+      // Show login modal or redirect to login
+      alert('Please sign in to purchase credits');
+      return;
+    }
+
+    setIsLoading(true);
+    setSelectedPlan(planId);
+
+    try {
+      // Create checkout session - use direct URL in development
+      const apiUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001/api/checkout/create'
+        : '/api/checkout/create';
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      alert(`Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+      setSelectedPlan(null);
+    }
+  };
   if (variant === 'banner') {
     return (
       <div className={`bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg p-4 ${className}`}>
@@ -26,17 +117,26 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
               className="w-5 h-5 text-yellow-300" 
             />
             <div>
-              <span className="font-semibold">Premium Plans Coming Soon!</span>
-              <span className="ml-2 text-blue-100">Unlimited portraits, priority processing & more</span>
+              <span className="font-semibold">Get More Credits</span>
+              <span className="ml-2 text-blue-100">Continue creating beautiful portraits</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onJoinWaitlist}
-              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Join Waitlist
-            </button>
+            {isAuthenticated ? (
+              <button
+                onClick={onShowPricing}
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Buy Credits
+              </button>
+            ) : (
+              <button
+                onClick={onJoinWaitlist}
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Sign In to Buy
+              </button>
+            )}
             {showClose && (
               <button
                 onClick={onClose}
@@ -60,12 +160,21 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           className="w-4 h-4 text-blue-600 dark:text-blue-400" 
         />
         <span>🚀 Launch weekend special - 50% OFF!</span>
-        <button
-          onClick={onJoinWaitlist}
-          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium ml-1 transition-colors"
-        >
-          Get notified →
-        </button>
+        {isAuthenticated ? (
+          <button
+            onClick={onShowPricing}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium ml-1 transition-colors"
+          >
+            Buy Now →
+          </button>
+        ) : (
+          <button
+            onClick={onJoinWaitlist}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium ml-1 transition-colors"
+          >
+            Sign In →
+          </button>
+        )}
       </div>
     );
   }
@@ -95,11 +204,11 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
         </div>
 
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-          Premium Plans Coming Soon!
+          Get More Credits
         </h3>
         
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          Get ready for unlimited portraits, priority processing, and exclusive wedding themes.
+          Choose a plan to continue creating beautiful wedding portraits with all 12 themes.
         </p>
 
         {/* Feature List */}
@@ -109,7 +218,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
               <Icon path="M5 13l4 4L19 7" className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
             <span className="text-gray-700 dark:text-gray-300">
-              <strong>Unlimited portraits</strong> - Generate as many as you want
+              <strong>All 12 themes</strong> - Access to every wedding style
             </span>
           </div>
           
@@ -118,7 +227,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
               <Icon path="M5 13l4 4L19 7" className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
             <span className="text-gray-700 dark:text-gray-300">
-              <strong>Priority processing</strong> - Skip the queue, get results faster
+              <strong>High-quality downloads</strong> - Perfect for printing and sharing
             </span>
           </div>
           
@@ -127,7 +236,7 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
               <Icon path="M5 13l4 4L19 7" className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
             <span className="text-gray-700 dark:text-gray-300">
-              <strong>Exclusive themes</strong> - Access premium wedding styles
+              <strong>No daily limits</strong> - Generate as many portraits as you need
             </span>
           </div>
           
@@ -136,58 +245,88 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
               <Icon path="M5 13l4 4L19 7" className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
             <span className="text-gray-700 dark:text-gray-300">
-              <strong>High-res downloads</strong> - Perfect quality for printing
+              <strong>Instant processing</strong> - Skip any queues, get results faster
             </span>
           </div>
         </div>
 
-        {/* Pricing Teaser */}
+        {/* Pricing Options */}
         <div className="bg-white dark:bg-gray-700 rounded-lg p-4 mb-6 border border-gray-200 dark:border-gray-600">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-2 text-center">🚀 Launch Weekend Special</div>
           <div className="text-xs text-center text-orange-600 dark:text-orange-400 font-medium mb-4">50% OFF - This Weekend Only!</div>
-          <div className="space-y-4">
-            {/* Pricing Grid */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                <div className="text-lg font-bold text-gray-900 dark:text-white mb-1">$4.99</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  <div className="font-medium">Starter</div>
-                  <div>10 credits</div>
-                  <div className="text-orange-600 dark:text-orange-400 text-[10px] mt-1">Launch Price</div>
+          <div className="space-y-3">
+            {/* Pricing Cards with Purchase Buttons */}
+            {pricingTiers.map((tier) => (
+              <div 
+                key={tier.id}
+                className={`
+                  relative bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border-2 transition-all
+                  ${tier.popular 
+                    ? 'border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' 
+                    : tier.bestValue 
+                    ? 'border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+                    : 'border-gray-200 dark:border-gray-600'
+                  }
+                `}
+              >
+                {tier.popular && (
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                      Most Popular
+                    </span>
+                  </div>
+                )}
+                {tier.bestValue && (
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full font-medium">
+                      Best Value
+                    </span>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">{tier.name}</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{tier.credits} credits</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      ${(tier.price / 100).toFixed(2)}
+                    </p>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    ${((tier.price / 100) / tier.credits).toFixed(2)} per credit
+                  </span>
                 </div>
               </div>
-              
-              <div className="text-center bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border-2 border-blue-200 dark:border-blue-700">
-                <div className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-1">$9.99</div>
-                <div className="text-xs text-blue-600 dark:text-blue-400">
-                  <div className="font-medium">Wedding</div>
-                  <div>25 credits</div>
-                  <div className="text-blue-600 dark:text-blue-400 text-[10px] mt-1">Most Popular</div>
-                </div>
-              </div>
-              
-              <div className="text-center bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-700">
-                <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-1">$24.99</div>
-                <div className="text-xs text-green-600 dark:text-green-400">
-                  <div className="font-medium">Party</div>
-                  <div>75 credits</div>
-                  <div className="text-green-600 dark:text-green-400 text-[10px] mt-1">Best Value</div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* CTA Button */}
+        {/* Call to Action Button */}
         <button
-          onClick={onJoinWaitlist}
-          className="w-full bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
+          onClick={onShowPricing}
+          className="w-full bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 mb-6"
         >
-          🎁 Join Waitlist & Get 10 Bonus Credits
+          View Pricing & Choose Your Plan
         </button>
 
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-          Everyone who joins gets 10 bonus credits! 50% off pricing is only for this weekend's launch 🎉
+        {/* Alternative: Join Waitlist */}
+        <div className="text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            Want to wait for more features? 
+          </p>
+          <button
+            onClick={onJoinWaitlist}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium transition-colors"
+          >
+            🎁 Join Waitlist & Get 10 Bonus Credits
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
+          {isAuthenticated 
+            ? "Secure payment powered by Stripe. Credits are added instantly!" 
+            : "Please sign in to purchase credits"
+          }
         </p>
       </div>
     </div>

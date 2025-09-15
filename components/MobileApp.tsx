@@ -23,6 +23,7 @@ import LimitReachedModal from './LimitReachedModal';
 import ImagePreviewModal from './ImagePreviewModal';
 import MaintenanceBanner from './MaintenanceBanner';
 import UpgradePrompt from './UpgradePrompt';
+import PricingModal from './PricingModal';
 
 // Skeleton components
 import {
@@ -124,12 +125,18 @@ const MobileApp: React.FC<MobileAppProps> = ({
   // Mobile-specific states only
   const [currentTab, setCurrentTab] = useState('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
 
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
   const { totalGenerations, dailyGenerations } = useGenerationCounter();
   const { user, isAuthenticated, signOut } = useAuth();
+  
+  // Debug logging for auth state changes
+  useEffect(() => {
+    console.log('MobileApp: Auth state changed - isAuthenticated:', isAuthenticated, 'user:', user?.email);
+  }, [isAuthenticated, user]);
   
   // Check maintenance mode
   const isMaintenanceMode = (import.meta.env as any).VITE_MAINTENANCE_MODE === 'true';
@@ -186,13 +193,62 @@ const MobileApp: React.FC<MobileAppProps> = ({
     }
   };
 
-  // Generation handler removed - using shared handler from App.tsx
+  // Purchase handler
+  const handlePurchase = async (priceId: string, planId: string) => {
+    if (!isAuthenticated || !user) {
+      showError('Please sign in to purchase credits');
+      return;
+    }
+
+    try {
+      // Create checkout session - use direct URL in development
+      const apiUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001/api/checkout/create'
+        : '/api/checkout/create';
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Close pricing modal and redirect to Stripe Checkout
+      setShowPricingModal(false);
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      showError(`Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   const handleTabChange = (tabId: string) => {
     setCurrentTab(tabId);
     
     switch (tabId) {
       case 'gallery':
+        if (!isAuthenticated) {
+          // Show login modal for unauthenticated users accessing gallery
+          showInfo('Please sign in to access your gallery');
+          setShowLoginModal(true);
+          return;
+        }
+        
         if (generatedContents && generatedContents.length > 0) {
           // Scroll to gallery
           const galleryElement = document.querySelector('.swipeable-gallery');
@@ -215,7 +271,49 @@ const MobileApp: React.FC<MobileAppProps> = ({
           setShowLoginModal(true);
         }
         break;
+      case 'signin':
+        setShowLoginModal(true);
+        break;
     }
+  };
+
+  // Create dynamic navigation items based on authentication status
+  const getNavigationItems = () => {
+    const baseItems = [
+      {
+        id: 'home',
+        label: 'Home',
+        icon: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'
+      },
+      {
+        id: 'gallery',
+        label: 'Gallery',
+        icon: 'M22 16V4c0-1.11-.89-2-2-2H8c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.11.89 2 2 2h14v-2H4V6H2z'
+      },
+      {
+        id: 'create',
+        label: 'Create',
+        icon: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z'
+      }
+    ];
+
+    if (isAuthenticated && user) {
+      // Show Profile tab if user is authenticated
+      baseItems.push({
+        id: 'profile',
+        label: 'Profile',
+        icon: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'
+      });
+    } else {
+      // Show Sign In tab if user is not authenticated
+      baseItems.push({
+        id: 'signin',
+        label: 'Sign In',
+        icon: 'M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5z'
+      });
+    }
+
+    return baseItems;
   };
 
   // Loading states with enhanced progress UI
@@ -229,6 +327,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
         onRefresh={handleRefresh}
         headerTitle="Generating Portraits..."
         navigate={navigate}
+        navigationItems={getNavigationItems()}
       >
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
           {/* Show current photo being processed */}
@@ -268,6 +367,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
         onRefresh={handleRefresh}
         headerTitle="WedAI"
         navigate={navigate}
+        navigationItems={getNavigationItems()}
       >
       <div className="space-y-6 p-4">
         {/* Photo Type Selector */}
@@ -282,6 +382,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
         <div className="flex justify-center">
           <UsageCounter variant="compact" showTimeUntilReset={true} />
         </div>
+
 
         {/* Image Upload Area - Only show if no image */}
         {!sourceImageUrl && (
@@ -423,7 +524,16 @@ const MobileApp: React.FC<MobileAppProps> = ({
               <div className="mt-6">
                 <UpgradePrompt 
                   variant="card"
-                  onJoinWaitlist={() => setShowLimitModal(true)}
+                  onJoinWaitlist={() => {
+                    // If not authenticated, show login modal
+                    // If authenticated, show limit modal for waitlist
+                    if (!isAuthenticated) {
+                      setShowLoginModal(true);
+                    } else {
+                      setShowLimitModal(true);
+                    }
+                  }}
+                  onShowPricing={() => setShowPricingModal(true)}
                 />
               </div>
             );
@@ -431,6 +541,17 @@ const MobileApp: React.FC<MobileAppProps> = ({
           return null;
         })()}
         
+        {/* Buy More Credits - Show for authenticated users at bottom */}
+        {isAuthenticated && user && (
+          <div className="mt-8">
+            <UpgradePrompt 
+              variant="banner"
+              onJoinWaitlist={() => setShowLimitModal(true)}
+              onShowPricing={() => setShowPricingModal(true)}
+            />
+          </div>
+        )}
+
         {/* Footer Section - Always show */}
         <div className="mt-8 space-y-6">
           {/* App Description */}
@@ -517,6 +638,15 @@ const MobileApp: React.FC<MobileAppProps> = ({
           onSignOut={signOut}
         />
       )}
+
+      {/* Pricing Modal */}
+      <PricingModal
+        isOpen={showPricingModal && !isMaintenanceMode}
+        onClose={() => setShowPricingModal(false)}
+        onPurchase={handlePurchase}
+        user={user}
+        isAuthenticated={isAuthenticated}
+      />
 
       {/* Toast Manager */}
       <MobileToastManager toasts={toasts} onDismiss={dismissToast} />

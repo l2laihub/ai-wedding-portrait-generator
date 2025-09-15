@@ -1,5 +1,5 @@
 -- WedAI Database Schema
--- Initial migration for monetization features
+-- Initial migration for monetization features (with IF NOT EXISTS for existing tables)
 
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -11,8 +11,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Waitlist table for email capture
-CREATE TABLE waitlist (
+-- Waitlist table for email capture (skip if exists)
+CREATE TABLE IF NOT EXISTS waitlist (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   source TEXT,
@@ -22,7 +22,7 @@ CREATE TABLE waitlist (
 );
 
 -- Usage analytics table
-CREATE TABLE usage_analytics (
+CREATE TABLE IF NOT EXISTS usage_analytics (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id TEXT,
   portrait_type TEXT,
@@ -31,7 +31,7 @@ CREATE TABLE usage_analytics (
 );
 
 -- Users table (extends auth.users)
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   display_name TEXT,
@@ -41,7 +41,7 @@ CREATE TABLE users (
 );
 
 -- User credits table
-CREATE TABLE user_credits (
+CREATE TABLE IF NOT EXISTS user_credits (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE PRIMARY KEY,
   free_credits_used_today INTEGER DEFAULT 0,
   paid_credits INTEGER DEFAULT 0,
@@ -50,7 +50,7 @@ CREATE TABLE user_credits (
 );
 
 -- Credit transactions table
-CREATE TABLE credit_transactions (
+CREATE TABLE IF NOT EXISTS credit_transactions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL, -- 'free_daily', 'purchase', 'bonus', 'usage', 'refund'
@@ -62,7 +62,7 @@ CREATE TABLE credit_transactions (
 );
 
 -- Referrals table
-CREATE TABLE referrals (
+CREATE TABLE IF NOT EXISTS referrals (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   referrer_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   referred_email TEXT NOT NULL,
@@ -72,15 +72,15 @@ CREATE TABLE referrals (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Indexes for performance
-CREATE INDEX idx_waitlist_email ON waitlist(email);
-CREATE INDEX idx_waitlist_created_at ON waitlist(created_at);
-CREATE INDEX idx_usage_analytics_timestamp ON usage_analytics(timestamp);
-CREATE INDEX idx_usage_analytics_session_id ON usage_analytics(session_id);
-CREATE INDEX idx_credit_transactions_user_id ON credit_transactions(user_id);
-CREATE INDEX idx_credit_transactions_created_at ON credit_transactions(created_at);
-CREATE INDEX idx_referrals_referrer_user_id ON referrals(referrer_user_id);
-CREATE INDEX idx_referrals_status ON referrals(status);
+-- Indexes for performance (CREATE IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_waitlist_email ON waitlist(email);
+CREATE INDEX IF NOT EXISTS idx_waitlist_created_at ON waitlist(created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_analytics_timestamp ON usage_analytics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_usage_analytics_session_id ON usage_analytics(session_id);
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_created_at ON credit_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_user_id ON referrals(referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE waitlist ENABLE ROW LEVEL SECURITY;
@@ -89,6 +89,18 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credit_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Anyone can insert into waitlist" ON waitlist;
+DROP POLICY IF EXISTS "Anyone can read waitlist count" ON waitlist;
+DROP POLICY IF EXISTS "Anyone can insert analytics" ON usage_analytics;
+DROP POLICY IF EXISTS "Users can view their own profile" ON users;
+DROP POLICY IF EXISTS "Users can update their own profile" ON users;
+DROP POLICY IF EXISTS "Users can view their own credits" ON user_credits;
+DROP POLICY IF EXISTS "Users can update their own credits" ON user_credits;
+DROP POLICY IF EXISTS "Users can view their own transactions" ON credit_transactions;
+DROP POLICY IF EXISTS "Users can view their own referrals" ON referrals;
+DROP POLICY IF EXISTS "Users can insert referrals" ON referrals;
 
 -- Waitlist policies (public read for count, insert only)
 CREATE POLICY "Anyone can insert into waitlist" ON waitlist
@@ -206,7 +218,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Admin views (for dashboard)
-CREATE VIEW admin_stats AS
+CREATE OR REPLACE VIEW admin_stats AS
 SELECT 
   (SELECT COUNT(*) FROM waitlist) as waitlist_count,
   (SELECT COUNT(*) FROM users) as user_count,

@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '../../services/stripeService'
-import { supabase } from '../../services/supabaseClient'
+import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
+
+// Server-side Stripe instance
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-12-18.acacia',
+})
+
+// Server-side Supabase instance
+const supabaseUrl = process.env.VITE_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function POST(req: NextRequest) {
   try {

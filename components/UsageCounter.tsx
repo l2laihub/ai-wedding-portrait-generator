@@ -112,7 +112,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           {isAuthenticated ? (
             creditBalance?.totalAvailable ? (
               creditBalance.freeCreditsRemaining > 0 ? 
-                `${Math.min(creditBalance.freeCreditsRemaining, displayLimit)}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} credits` :
+                `${Math.min(creditBalance.freeCreditsRemaining, displayLimit)}/5 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} credits` :
                 `${creditBalance.totalAvailable} credits available`
             ) : (
               '0 credits remaining'

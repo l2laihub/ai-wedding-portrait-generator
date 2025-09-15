@@ -3,6 +3,13 @@ import { useViewport } from '../hooks/useViewport';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useHapticFeedback } from './MobileEnhancements';
 import BottomNavigation, { defaultNavItems } from './BottomNavigation';
+
+interface NavItem {
+  id: string;
+  label: string;
+  icon: string;
+  badge?: number;
+}
 import MobileDrawer from './MobileDrawer';
 import Icon from './Icon';
 
@@ -16,6 +23,7 @@ interface MobileAppShellProps {
   headerTitle?: string;
   className?: string;
   navigate?: (route: 'home' | 'privacy' | 'terms') => void;
+  navigationItems?: NavItem[];
 }
 
 const MobileAppShell: React.FC<MobileAppShellProps> = ({
@@ -27,7 +35,8 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   showHeader = true,
   headerTitle = 'WedAI',
   className = '',
-  navigate
+  navigate,
+  navigationItems
 }) => {
   const { isMobile, orientation } = useViewport();
   const { isOnline } = useNetworkStatus();
@@ -281,7 +290,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
         <BottomNavigation
           activeTab={currentTab}
           onTabChange={handleTabChange}
-          items={defaultNavItems}
+          items={navigationItems || defaultNavItems}
         />
       )}
 

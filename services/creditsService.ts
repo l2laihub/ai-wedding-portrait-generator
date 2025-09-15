@@ -68,21 +68,23 @@ class CreditsService {
         throw new Error('Failed to get credit balance');
       }
 
-      const credits = data || {
-        free_credits_used_today: 0,
-        paid_credits: 0,
-        bonus_credits: 0,
-        last_free_reset: new Date().toISOString().split('T')[0]
+      // Handle the data which is an array from the database function
+      const creditsArray = Array.isArray(data) ? data : [data];
+      const credits = creditsArray[0] || {
+        ret_free_credits_used_today: 0,
+        ret_paid_credits: 0,
+        ret_bonus_credits: 0,
+        ret_last_free_reset: new Date().toISOString().split('T')[0]
       };
 
-      const freeCreditsRemaining = Math.max(0, FREE_DAILY_LIMIT - credits.free_credits_used_today);
-      const totalAvailable = freeCreditsRemaining + credits.paid_credits + credits.bonus_credits;
+      const freeCreditsRemaining = Math.max(0, FREE_DAILY_LIMIT - (credits.ret_free_credits_used_today || 0));
+      const totalAvailable = freeCreditsRemaining + (credits.ret_paid_credits || 0) + (credits.ret_bonus_credits || 0);
 
       return {
-        freeCreditsUsed: credits.free_credits_used_today,
+        freeCreditsUsed: credits.ret_free_credits_used_today || 0,
         freeCreditsRemaining,
-        paidCredits: credits.paid_credits,
-        bonusCredits: credits.bonus_credits,
+        paidCredits: credits.ret_paid_credits || 0,
+        bonusCredits: credits.ret_bonus_credits || 0,
         totalAvailable,
         canUseCredits: totalAvailable > 0
       };

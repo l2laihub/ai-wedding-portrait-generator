@@ -9,12 +9,15 @@ import MaintenanceToggle from './components/MaintenanceToggle';
 import UsageCounter from './components/UsageCounter';
 import LimitReachedModal from './components/LimitReachedModal';
 import UpgradePrompt from './components/UpgradePrompt';
+import PricingModal from './components/PricingModal';
+import SuccessPage from './components/SuccessPage';
 import { NetworkStatus, PerformanceMonitor } from './components/MobileEnhancements';
 import MobileApp from './components/MobileApp';
 import SplashScreen from './components/SplashScreen';
 import { rateLimiter } from './utils/rateLimiter';
 import { databaseService } from './services/databaseService';
 import { creditsService } from './services/creditsService';
+import { supabase } from './services/supabaseClient';
 import LoginModal from './components/LoginModal';
 import UserProfile from './components/UserProfile';
 import { useAuth } from './hooks/useAuth';
@@ -114,6 +117,9 @@ function App({ navigate }: AppProps) {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+  const [showPricingModal, setShowPricingModal] = useState<boolean>(false);
+  const [showSuccessPage, setShowSuccessPage] = useState<boolean>(false);
+  const [successSessionId, setSuccessSessionId] = useState<string | null>(null);
   const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [appReady, setAppReady] = useState<boolean>(false);
@@ -521,6 +527,58 @@ function App({ navigate }: AppProps) {
     setShowProfileModal(false);
   };
 
+  // Purchase handler
+  const handlePurchase = async (priceId: string, planId: string) => {
+    if (!isAuthenticated || !user) {
+      alert('Please sign in to purchase credits');
+      return;
+    }
+
+    try {
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No valid session found');
+      }
+
+      // Create checkout session using Supabase Edge Function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ptgmobxrvptiahundusu.supabase.co';
+      const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+        },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Close pricing modal and redirect to Stripe Checkout
+      setShowPricingModal(false);
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      alert(`Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Shared reset function for both desktop and mobile
   const resetState = () => {
     setSourceImageFile(null);
@@ -537,6 +595,29 @@ function App({ navigate }: AppProps) {
     setShowSplash(false);
     setAppReady(true);
   };
+
+  // Check for payment success on page load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const sessionId = urlParams.get('session_id');
+    
+    console.log('Checking URL params:', { success, sessionId, search: window.location.search });
+    
+    // Only show success page if we have BOTH success=true AND a valid session_id
+    // Also ensure we haven't already processed this (prevent double-processing in React Strict Mode)
+    if (success === 'true' && sessionId && sessionId.trim() !== '' && !showSuccessPage) {
+      console.log('Payment success detected, showing success page');
+      setShowSuccessPage(true);
+      setSuccessSessionId(sessionId); // Store session ID for SuccessPage
+      // Clear URL parameters immediately to prevent double processing
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (success === 'true' && (!sessionId || sessionId.trim() === '')) {
+      console.warn('Success=true found but no session_id - payment may have failed');
+      // Clear invalid parameters to prevent confusion
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [showSuccessPage]);
 
   // Handle escape key for upgrade modal
   useEffect(() => {
@@ -581,6 +662,21 @@ function App({ navigate }: AppProps) {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
   }, []);
+
+  // Show success page if payment was successful
+  if (showSuccessPage) {
+    return (
+      <SuccessPage
+        sessionId={successSessionId}
+        onComplete={() => {
+          setShowSuccessPage(false);
+          setSuccessSessionId(null);
+          // Force refresh auth state and credits
+          window.location.reload();
+        }}
+      />
+    );
+  }
 
   // Return mobile app experience for mobile devices - moved after all hooks
   if (isMobile && !appReady) {
@@ -757,6 +853,7 @@ function App({ navigate }: AppProps) {
                   <UpgradePrompt 
                     variant="card"
                     onJoinWaitlist={() => setShowLimitModal(true)}
+                    onShowPricing={() => setShowPricingModal(true)}
                   />
                 </div>
               );
@@ -811,6 +908,17 @@ function App({ navigate }: AppProps) {
             </div>
             );
           })()}
+
+          {/* Buy More Credits - Show for authenticated users at bottom */}
+          {isAuthenticated && user && (
+            <div className="mt-12">
+              <UpgradePrompt 
+                variant="banner"
+                onJoinWaitlist={() => setShowLimitModal(true)}
+                onShowPricing={() => setShowPricingModal(true)}
+              />
+            </div>
+          )}
         </div>
       </main>
       
@@ -861,6 +969,7 @@ function App({ navigate }: AppProps) {
               showClose={true}
               onClose={() => setShowUpgradePrompt(false)}
               onJoinWaitlist={() => setShowLimitModal(true)}
+              onShowPricing={() => setShowPricingModal(true)}
             />
           </div>
         </div>
@@ -885,6 +994,15 @@ function App({ navigate }: AppProps) {
           onSignOut={handleSignOut}
         />
       )}
+
+      {/* Pricing Modal */}
+      <PricingModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+        onPurchase={handlePurchase}
+        user={user}
+        isAuthenticated={isAuthenticated}
+      />
     </div>
   );
 }

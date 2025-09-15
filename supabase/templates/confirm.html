@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your Email - WedAI</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        
+        /* Container */
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+            margin: 0;
+        }
+        
+        /* Content */
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #1f2937;
+            margin-bottom: 24px;
+        }
+        
+        .message {
+            font-size: 16px;
+            color: #4b5563;
+            line-height: 1.7;
+            margin-bottom: 32px;
+        }
+        
+        /* CTA Button */
+        .cta-container {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        /* Alternative link */
+        .alternative-link {
+            background-color: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 32px 0;
+        }
+        
+        .alternative-link p {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+        
+        .alternative-link a {
+            color: #667eea;
+            word-break: break-all;
+            font-size: 14px;
+            text-decoration: none;
+        }
+        
+        .alternative-link a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Footer */
+        .footer {
+            background-color: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer p {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .footer .company {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        /* Security notice */
+        .security-notice {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 24px 0;
+        }
+        
+        .security-notice p {
+            font-size: 14px;
+            color: #92400e;
+            margin: 0;
+        }
+        
+        /* Responsive design */
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .footer {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .cta-button {
+                padding: 14px 28px;
+                font-size: 15px;
+            }
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .alternative-link {
+                background-color: #1f2937;
+                border-color: #374151;
+            }
+            
+            .footer {
+                background-color: #1f2937;
+                border-color: #374151;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 20px 0;">
+        <div class="email-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="logo">
+                    <img src="https://raw.githubusercontent.com/l2laihub/ai-wedding-portrait-generator/main/public/assets/wedai_logo_notext_nobg.png" alt="WedAI Logo" />
+                </div>
+                <h1>Welcome to WedAI!</h1>
+                <p>AI-Powered Wedding Portrait Generator</p>
+            </div>
+            
+            <!-- Content -->
+            <div class="content">
+                <div class="greeting">
+                    Hello there! 👋
+                </div>
+                
+                <div class="message">
+                    <p>Thank you for joining WedAI! We're excited to help you create stunning AI-generated wedding portraits that capture your special moments.</p>
+                    
+                    <p>To get started and unlock your free daily credits, please confirm your email address by clicking the button below:</p>
+                </div>
+                
+                <!-- CTA Button -->
+                <div class="cta-container">
+                    <a href="{{ .ConfirmationURL }}" class="cta-button">
+                        Confirm My Email Address
+                    </a>
+                </div>
+                
+                <!-- Alternative link -->
+                <div class="alternative-link">
+                    <p><strong>Can't click the button?</strong> Copy and paste this link into your browser:</p>
+                    <a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a>
+                </div>
+                
+                <!-- Security notice -->
+                <div class="security-notice">
+                    <p><strong>Security Notice:</strong> If you didn't create an account with WedAI, please ignore this email. This confirmation link will expire in 24 hours for your security.</p>
+                </div>
+                
+                <div class="message">
+                    <p>Once confirmed, you'll be able to:</p>
+                    <ul style="margin: 16px 0; padding-left: 20px; color: #4b5563;">
+                        <li>Generate 5 free wedding portraits daily</li>
+                        <li>Choose from 12 beautiful themes</li>
+                        <li>Download high-quality images</li>
+                        <li>Access premium features</li>
+                    </ul>
+                    
+                    <p>We can't wait to see the beautiful portraits you create!</p>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="footer">
+                <p class="company">WedAI Team</p>
+                <p>Creating magical wedding memories with AI</p>
+                <p style="margin-top: 16px;">
+                    <a href="mailto:huybuilds@gmail.com" style="color: #667eea; text-decoration: none;">support@wedai.app</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

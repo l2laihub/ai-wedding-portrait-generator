@@ -88,21 +88,20 @@ const LoginModal: React.FC<LoginModalProps> = ({
         // Sign in with timeout protection
         const signInData: SignInData = { email, password };
         
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Sign in timeout - please try again')), 15000)
-        );
-        
-        const result = await Promise.race([
-          authService.signIn(signInData),
-          timeoutPromise
-        ]);
+        // Direct sign-in without timeout race condition
+        const result = await authService.signIn(signInData);
         
         if (result.success && result.user) {
+          console.log('Login modal: Sign in successful, calling onSuccess callback');
           setSuccess('Signed in successfully!');
           onSuccess?.(result.user);
-          setTimeout(onClose, 1000);
+          setTimeout(() => {
+            console.log('Login modal: Closing modal after successful sign in');
+            onClose();
+          }, 1000);
         } else {
-          setError(result.error || 'Sign in failed');
+          console.error('Login modal: Sign in failed:', result.error);
+          setError(result.error || 'Sign in failed. Please check your credentials and try again.');
         }
       }
     } catch (err) {
@@ -181,13 +180,19 @@ const LoginModal: React.FC<LoginModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto animate-in fade-in duration-200"
       onClick={handleBackdropClick}
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
+      }}
     >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div 
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full my-auto animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+          style={{ maxHeight: 'calc(100vh - 4rem)' }}
+        >
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
@@ -210,7 +215,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1">
           {/* Success Message */}
           {success && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg p-3 mb-4">
@@ -396,6 +401,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
