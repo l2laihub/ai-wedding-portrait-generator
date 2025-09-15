@@ -109,7 +109,7 @@ function App({ navigate }: AppProps) {
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
   const [photoType, setPhotoType] = useState<'single' | 'couple' | 'family'>('couple');
-  const [familyMemberCount, setFamilyMemberCount] = useState<number>(4);
+  const [familyMemberCount, setFamilyMemberCount] = useState<number>(3);
   const [showLimitModal, setShowLimitModal] = useState<boolean>(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState<boolean>(false);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);

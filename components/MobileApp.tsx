@@ -148,7 +148,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
     return shuffled.slice(0, 3);
   };
 
-  // Handle refresh for mobile app shell
+  // Handle refresh for mobile app shell - avoid unwanted regeneration
   const handleRefresh = async () => {
     if (!isOnline) {
       showWarning('Please check your connection');
@@ -157,13 +157,12 @@ const MobileApp: React.FC<MobileAppProps> = ({
 
     setIsRefreshing(true);
     try {
+      // Just refresh the app state without regenerating photos
+      // Trigger counter updates and check for any pending data
+      window.dispatchEvent(new CustomEvent('counterUpdate'));
+      
       // Show success feedback
       showSuccess('Refreshed successfully');
-      
-      // If there's an image, trigger a new generation
-      if (sourceImageFile) {
-        await handleMobileGenerate();
-      }
     } finally {
       setIsRefreshing(false);
     }
@@ -327,6 +326,22 @@ const MobileApp: React.FC<MobileAppProps> = ({
             <SwipeableGallery
               contents={generatedContents}
               generationId={currentGenerationId}
+              onShowToast={(message, type) => {
+                switch (type) {
+                  case 'success':
+                    showSuccess(message);
+                    break;
+                  case 'error':
+                    showError(message);
+                    break;
+                  case 'warning':
+                    showWarning(message);
+                    break;
+                  case 'info':
+                    showInfo(message);
+                    break;
+                }
+              }}
             />
             
             {/* Try Again Section */}

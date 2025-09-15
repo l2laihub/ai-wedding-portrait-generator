@@ -10,12 +10,14 @@ interface SwipeableGalleryProps {
   contents: GeneratedContent[];
   generationId?: string;
   onImageTap?: (index: number) => void;
+  onShowToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
 const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
   contents,
   generationId,
-  onImageTap
+  onImageTap,
+  onShowToast
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showActions, setShowActions] = useState(false);
@@ -158,19 +160,80 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
 
   const handleDownload = async () => {
     const content = contents[currentIndex];
-    if (!content.imageUrl) return;
+    if (!content.imageUrl) {
+      onShowToast?.('No image available to save', 'error');
+      return;
+    }
     
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `wedding-portrait-${content.style?.toLowerCase().replace(/ /g, '-')}_${timestamp}.png`;
-    
-    posthogService.trackImageDownloaded(content.style || 'unknown', generationId || 'unknown');
-    
-    const link = document.createElement('a');
-    link.href = content.imageUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `wedding-portrait-${content.style?.toLowerCase().replace(/ /g, '-')}_${timestamp}.png`;
+      
+      // Check if this is actually a real iOS device (not just responsive mode)
+      const isRealIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isActualSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+      
+      // Only use iOS-specific handling for real iOS Safari
+      if (isRealIOS && isActualSafari) {
+        // Real iOS Safari - limited download capabilities
+        try {
+          const response = await fetch(content.imageUrl);
+          const blob = await response.blob();
+          
+          // For iOS Safari, open in new tab is the most reliable method
+          const url = URL.createObjectURL(blob);
+          const newWindow = window.open(url, '_blank');
+          if (newWindow) {
+            onShowToast?.('Photo opened in new tab. Long press and select "Save to Photos"', 'info');
+          } else {
+            // Fallback: copy image URL
+            if (navigator.clipboard) {
+              await navigator.clipboard.writeText(content.imageUrl);
+              onShowToast?.('Image link copied to clipboard', 'info');
+            } else {
+              throw new Error('Unable to save on this device');
+            }
+          }
+          // Clean up the object URL after a delay
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+        } catch (iosError) {
+          console.error('iOS save failed:', iosError);
+          // Final fallback - just copy the original URL
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(content.imageUrl);
+            onShowToast?.('Image link copied to clipboard. Open link to save photo.', 'info');
+          } else {
+            throw new Error('Unable to save on this device');
+          }
+        }
+      } else {
+        // Standard download for desktop browsers, Chrome mobile, etc.
+        try {
+          const link = document.createElement('a');
+          link.href = content.imageUrl;
+          link.download = filename;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          onShowToast?.('Photo saved successfully!', 'success');
+        } catch (downloadError) {
+          // If standard download fails, try opening in new tab
+          const newWindow = window.open(content.imageUrl, '_blank');
+          if (newWindow) {
+            onShowToast?.('Photo opened in new tab. Right-click to save.', 'info');
+          } else {
+            throw new Error('Download failed');
+          }
+        }
+      }
+      
+      posthogService.trackImageDownloaded(content.style || 'unknown', generationId || 'unknown');
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      onShowToast?.('Failed to save photo. Please try again.', 'error');
+    }
     
     setShowActions(false);
   };
@@ -203,7 +266,7 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
   const currentContent = contents[currentIndex];
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full swipeable-gallery">
       {/* Gallery Container */}
       <div 
         ref={containerRef}
@@ -211,7 +274,11 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
         style={{ 
           height: '70vh', 
           maxHeight: '600px',
-          touchAction: 'pan-x' // Allow horizontal panning for swipe
+          touchAction: 'pan-x', // Allow horizontal panning for swipe
+          overscrollBehavior: 'contain', // Prevent pull-to-refresh when scrolling gallery
+          WebkitOverscrollBehavior: 'contain', // Safari specific
+          position: 'relative',
+          zIndex: 10 // Ensure it's above pull-to-refresh detection
         }}
         onClick={handleImageTap}
       >

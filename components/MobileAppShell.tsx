@@ -50,6 +50,12 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
     if (!isMobile || !onRefresh) return;
 
     const handleTouchStart = (e: TouchEvent) => {
+      // Don't trigger pull-to-refresh if touching within gallery area
+      const target = e.target as HTMLElement;
+      if (target?.closest('.swipeable-gallery')) {
+        return;
+      }
+      
       if (window.scrollY === 0) {
         setTouchStart(e.targetTouches[0].clientY);
       }
@@ -57,6 +63,12 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!touchStart) return;
+      
+      // Don't trigger pull-to-refresh if touching within gallery area
+      const target = e.target as HTMLElement;
+      if (target?.closest('.swipeable-gallery')) {
+        return;
+      }
       
       const touchY = e.targetTouches[0].clientY;
       const diff = touchY - touchStart;

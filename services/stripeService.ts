@@ -47,29 +47,29 @@ export interface CheckoutResult {
 export const PRICING_TIERS: PricingTier[] = [
   {
     id: 'starter',
-    name: 'Starter Pack',
-    description: 'Perfect for trying out our AI portraits',
-    credits: 5,
+    name: 'Starter',
+    description: 'Launch price - Perfect for trying out our AI portraits',
+    credits: 10,
     price: 499, // $4.99
     priceId: 'price_1QSxxxxxxxxxxx', // Replace with actual Stripe price ID
     features: [
-      '5 AI portrait credits',
-      'All wedding themes available',
+      '10 AI portrait credits',
+      'All 12 wedding themes available',
       'High-resolution downloads',
       'Commercial usage rights'
     ]
   },
   {
     id: 'wedding',
-    name: 'Wedding Pack',
+    name: 'Wedding',
     description: 'Most popular choice for couples',
-    credits: 20,
+    credits: 25,
     price: 999, // $9.99
     priceId: 'price_1QSyxxxxxxxxxx', // Replace with actual Stripe price ID
     popular: true,
     features: [
-      '20 AI portrait credits',
-      'All premium wedding themes',
+      '25 AI portrait credits',
+      'All 12 premium wedding themes',
       'High-resolution downloads',
       'Priority processing',
       'Commercial usage rights',
@@ -78,14 +78,14 @@ export const PRICING_TIERS: PricingTier[] = [
   },
   {
     id: 'party',
-    name: 'Party Pack',
+    name: 'Party',
     description: 'Best value for large celebrations',
-    credits: 50,
-    price: 1999, // $19.99
+    credits: 75,
+    price: 2499, // $24.99
     priceId: 'price_1QSzxxxxxxxxxx', // Replace with actual Stripe price ID
     bestValue: true,
     features: [
-      '50 AI portrait credits',
+      '75 AI portrait credits',
       'All exclusive themes',
       'Ultra high-resolution downloads',
       'Priority processing',

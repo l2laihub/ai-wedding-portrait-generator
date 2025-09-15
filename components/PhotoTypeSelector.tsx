@@ -67,7 +67,7 @@ const PhotoTypeSelector: React.FC<PhotoTypeSelectorProps> = ({
           </label>
           <div className="flex items-center justify-center gap-3">
             <button
-              onClick={() => onFamilyMemberCountChange(Math.max(3, familyMemberCount - 1))}
+              onClick={() => onFamilyMemberCountChange(Math.max(2, familyMemberCount - 1))}
               className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
               aria-label="Decrease count"
             >
@@ -77,7 +77,7 @@ const PhotoTypeSelector: React.FC<PhotoTypeSelectorProps> = ({
               {familyMemberCount}
             </span>
             <button
-              onClick={() => onFamilyMemberCountChange(Math.min(10, familyMemberCount + 1))}
+              onClick={() => onFamilyMemberCountChange(Math.min(8, familyMemberCount + 1))}
               className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
               aria-label="Increase count"
             >

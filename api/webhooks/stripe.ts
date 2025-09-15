@@ -111,6 +111,36 @@ async function markEventProcessed(
 }
 
 /**
+ * Calculate credits from payment amount based on pricing tiers
+ */
+function getCreditsFromAmount(amountInCents: number): number {
+  // Pricing tiers based on stripeService.ts
+  switch (amountInCents) {
+    case 499:  // $4.99 - Starter Pack
+      return 10;
+    case 999:  // $9.99 - Wedding Pack
+      return 25;
+    case 2499: // $24.99 - Party Pack
+      return 75;
+    default:
+      // Handle discounted amounts (50% off for launch weekend)
+      const discountedAmounts = {
+        250: 10,  // $2.50 (50% off Starter)
+        500: 25,  // $5.00 (50% off Wedding) 
+        1250: 75  // $12.50 (50% off Party)
+      };
+      
+      if (discountedAmounts[amountInCents as keyof typeof discountedAmounts]) {
+        return discountedAmounts[amountInCents as keyof typeof discountedAmounts];
+      }
+      
+      // Fallback calculation for unknown amounts
+      console.warn(`Unknown payment amount: ${amountInCents} cents`);
+      return Math.floor(amountInCents / 50); // Default: 1 credit per $0.50
+  }
+}
+
+/**
  * Process checkout.session.completed event
  */
 async function handleCheckoutSessionCompleted(event: WebhookEvent): Promise<WebhookProcessingResult> {
@@ -119,8 +149,8 @@ async function handleCheckoutSessionCompleted(event: WebhookEvent): Promise<Webh
   const paymentIntentId = session.payment_intent as string;
   const amountTotal = session.amount_total || 0;
   
-  // Calculate credits (assuming $1 = 10 credits)
-  const creditsToAdd = Math.floor(amountTotal / 10);
+  // Calculate credits based on our pricing tiers
+  const creditsToAdd = getCreditsFromAmount(amountTotal);
 
   try {
     // Start transaction
