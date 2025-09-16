@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient'
 import { User, Session, AuthError } from '@supabase/supabase-js'
+import { rateLimiter } from '../utils/rateLimiter'
+import { authErrorHandler, type ErrorContext } from '../utils/authErrors'
 
 export interface AuthUser {
   id: string
@@ -8,12 +10,17 @@ export interface AuthUser {
   createdAt: string
   referralCode?: string
   role?: string
+  sessionId?: string
+  lastActivity?: string
 }
 
 export interface AuthResult {
   success: boolean
   user?: AuthUser
   error?: string
+  errorType?: string
+  retryable?: boolean
+  retryAfter?: number
 }
 
 export interface SignUpData {
@@ -28,9 +35,20 @@ export interface SignInData {
   password: string
 }
 
+interface SessionInfo {
+  id: string
+  userId: string
+  expiresAt: Date
+  lastActivity: Date
+  ipAddress?: string
+  userAgent?: string
+}
+
 class AuthService {
   private currentUser: AuthUser | null = null
   private currentSession: Session | null = null
+  private sessionInfo: SessionInfo | null = null
+  private sessionRefreshTimer: NodeJS.Timeout | null = null
 
   constructor() {
     // Set up auth state listener
@@ -300,8 +318,37 @@ class AuthService {
    * Sign in user
    */
   async signIn(data: SignInData): Promise<AuthResult> {
+    const requestId = this.generateRequestId()
+    const context: ErrorContext = {
+      action: 'signin',
+      email: data.email,
+      ipAddress: await this.getClientIP(),
+      userAgent: navigator?.userAgent,
+      metadata: { request_id: requestId }
+    }
+
     try {
-      console.log('Starting sign in process for:', data.email)
+      console.log('Starting sign in process for:', data.email, 'RequestID:', requestId)
+      
+      // Check rate limiting
+      const rateLimitAllowed = await this.checkAuthRateLimit(data.email, 'login_attempt')
+      if (!rateLimitAllowed) {
+        return await this.handleAuthError(
+          { message: 'Rate limit exceeded', code: 'RATE_LIMIT_EXCEEDED' },
+          context,
+          requestId
+        )
+      }
+
+      // Check if account is blocked
+      const isBlocked = await this.checkAccountBlocked(data.email)
+      if (isBlocked) {
+        return await this.handleAuthError(
+          { message: 'Account temporarily locked', code: 'ACCOUNT_LOCKED' },
+          context,
+          requestId
+        )
+      }
       
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
@@ -310,18 +357,34 @@ class AuthService {
 
       if (authError) {
         console.error('Supabase auth error:', authError)
-        return { success: false, error: authError.message }
+        
+        // Record failed login attempt
+        await this.recordFailedLogin(data.email)
+        
+        return await this.handleAuthError(authError, context, requestId)
       }
 
       if (!authData.user || !authData.session) {
         console.error('No user or session returned from Supabase')
-        return { success: false, error: 'Sign in failed' }
+        await this.recordFailedLogin(data.email)
+        
+        return await this.handleAuthError(
+          { message: 'Authentication failed', code: 'AUTH_FAILED' },
+          context,
+          requestId
+        )
       }
 
       console.log('Supabase auth successful for:', authData.user.email)
       
+      // Clear failed login attempts
+      await this.clearFailedLoginAttempts(data.email)
+      
       // Store session immediately
       this.currentSession = authData.session
+      
+      // Create secure session tracking
+      await this.createSecureSession(authData.user.id, authData.session)
       
       // Create immediate user object from auth data - don't wait for profile loading
       const immediateUser = {
@@ -329,11 +392,26 @@ class AuthService {
         email: authData.user.email || '',
         displayName: authData.user.user_metadata?.display_name || '',
         createdAt: authData.user.created_at || new Date().toISOString(),
-        referralCode: undefined
+        referralCode: undefined,
+        sessionId: this.sessionInfo?.id
       }
       
       // Set current user immediately
       this.currentUser = immediateUser
+      
+      // Log successful login
+      await this.logSecurityEvent({
+        event_type: 'login_successful',
+        user_id: authData.user.id,
+        email: authData.user.email,
+        ip_address: await this.getClientIP(),
+        user_agent: navigator?.userAgent,
+        success: true,
+        metadata: {
+          session_id: this.sessionInfo?.id,
+          request_id: requestId
+        }
+      })
       
       console.log('Sign in successful for:', immediateUser.email)
       
@@ -343,7 +421,11 @@ class AuthService {
       return { success: true, user: immediateUser }
     } catch (err) {
       console.error('Sign in error:', err)
-      return { success: false, error: 'Sign in failed. Please try again.' }
+      
+      // Record failed attempt on unexpected error
+      await this.recordFailedLogin(data.email)
+      
+      return await this.handleAuthError(err, context, requestId)
     }
   }
 
@@ -376,14 +458,32 @@ class AuthService {
    */
   async signOut(): Promise<{ success: boolean; error?: string }> {
     try {
+      const currentUserId = this.currentUser?.id
+      
+      // Invalidate session before signing out
+      await this.invalidateSession()
+      
       const { error } = await supabase.auth.signOut()
       
       if (error) {
         return { success: false, error: error.message }
       }
 
+      // Log security event
+      if (currentUserId) {
+        await this.logSecurityEvent({
+          event_type: 'logout_successful',
+          user_id: currentUserId,
+          ip_address: await this.getClientIP(),
+          user_agent: navigator?.userAgent,
+          success: true
+        })
+      }
+
       this.currentUser = null
       this.currentSession = null
+      this.sessionInfo = null
+      this.clearSessionRefreshTimer()
       
       return { success: true }
     } catch (err) {
@@ -562,6 +662,414 @@ class AuthService {
     if (profile) {
       this.currentUser = profile;
       console.log('User profile refreshed, role:', profile.role);
+    }
+  }
+
+  /**
+   * Session Management Methods
+   */
+
+  /**
+   * Create secure session with tracking
+   */
+  private async createSecureSession(userId: string, session: Session): Promise<void> {
+    try {
+      const sessionToken = this.generateSecureToken()
+      const refreshTokenHash = await this.hashToken(session.refresh_token || '')
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      const ipAddress = await this.getClientIP()
+      const userAgent = navigator?.userAgent || 'unknown'
+
+      // Create session in database
+      const { data, error } = await supabase.rpc('create_user_session', {
+        p_user_id: userId,
+        p_session_token: sessionToken,
+        p_refresh_token_hash: refreshTokenHash,
+        p_ip_address: ipAddress,
+        p_user_agent: userAgent,
+        p_expires_at: expiresAt.toISOString()
+      })
+
+      if (error) {
+        console.error('Failed to create secure session:', error)
+        return
+      }
+
+      // Store session info locally
+      this.sessionInfo = {
+        id: data,
+        userId,
+        expiresAt,
+        lastActivity: new Date(),
+        ipAddress,
+        userAgent
+      }
+
+      // Set up session refresh timer
+      this.setupSessionRefreshTimer()
+
+      // Log security event
+      await this.logSecurityEvent({
+        event_type: 'session_created',
+        user_id: userId,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        success: true,
+        metadata: {
+          session_id: data,
+          expires_at: expiresAt.toISOString()
+        }
+      })
+
+    } catch (error) {
+      console.error('Error creating secure session:', error)
+    }
+  }
+
+  /**
+   * Update session activity
+   */
+  private async updateSessionActivity(): Promise<void> {
+    if (!this.sessionInfo || !this.currentSession) return
+
+    try {
+      const now = new Date()
+      
+      // Update local session info
+      this.sessionInfo.lastActivity = now
+
+      // Update session in database (throttled to every 5 minutes)
+      const lastUpdate = this.sessionInfo.lastActivity.getTime()
+      const fiveMinutesAgo = now.getTime() - 5 * 60 * 1000
+
+      if (lastUpdate < fiveMinutesAgo) {
+        await supabase
+          .from('user_sessions')
+          .update({ last_activity: now.toISOString() })
+          .eq('id', this.sessionInfo.id)
+      }
+
+    } catch (error) {
+      console.error('Error updating session activity:', error)
+    }
+  }
+
+  /**
+   * Validate current session
+   */
+  private async validateSession(): Promise<boolean> {
+    if (!this.sessionInfo || !this.currentSession) return false
+
+    try {
+      // Check if session is expired
+      if (this.sessionInfo.expiresAt <= new Date()) {
+        await this.invalidateSession()
+        return false
+      }
+
+      // Validate session exists in database
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select('id, is_active, expires_at')
+        .eq('id', this.sessionInfo.id)
+        .eq('is_active', true)
+        .single()
+
+      if (error || !data) {
+        await this.invalidateSession()
+        return false
+      }
+
+      return true
+
+    } catch (error) {
+      console.error('Error validating session:', error)
+      return false
+    }
+  }
+
+  /**
+   * Invalidate current session
+   */
+  private async invalidateSession(): Promise<void> {
+    try {
+      if (this.sessionInfo) {
+        // Mark session as inactive in database
+        await supabase
+          .from('user_sessions')
+          .update({ is_active: false })
+          .eq('id', this.sessionInfo.id)
+
+        // Log security event
+        await this.logSecurityEvent({
+          event_type: 'session_invalidated',
+          user_id: this.sessionInfo.userId,
+          success: true,
+          metadata: {
+            session_id: this.sessionInfo.id,
+            reason: 'expired_or_invalid'
+          }
+        })
+      }
+
+      // Clear local session data
+      this.sessionInfo = null
+      this.clearSessionRefreshTimer()
+
+    } catch (error) {
+      console.error('Error invalidating session:', error)
+    }
+  }
+
+  /**
+   * Setup session refresh timer
+   */
+  private setupSessionRefreshTimer(): void {
+    this.clearSessionRefreshTimer()
+
+    // Refresh session every 30 minutes
+    this.sessionRefreshTimer = setInterval(async () => {
+      await this.updateSessionActivity()
+      
+      // Validate session periodically
+      const isValid = await this.validateSession()
+      if (!isValid) {
+        await this.signOut()
+      }
+    }, 30 * 60 * 1000)
+  }
+
+  /**
+   * Clear session refresh timer
+   */
+  private clearSessionRefreshTimer(): void {
+    if (this.sessionRefreshTimer) {
+      clearInterval(this.sessionRefreshTimer)
+      this.sessionRefreshTimer = null
+    }
+  }
+
+  /**
+   * Security and Rate Limiting Methods
+   */
+
+  /**
+   * Check rate limiting before auth operations
+   */
+  private async checkAuthRateLimit(identifier: string, action: string): Promise<boolean> {
+    try {
+      const isAllowed = await rateLimiter.checkAuthLimit(identifier, action)
+      
+      if (!isAllowed) {
+        await this.logSecurityEvent({
+          event_type: 'rate_limit_exceeded',
+          email: identifier,
+          ip_address: await this.getClientIP(),
+          user_agent: navigator?.userAgent,
+          success: false,
+          metadata: { action }
+        })
+      }
+
+      return isAllowed
+    } catch (error) {
+      console.error('Rate limit check error:', error)
+      return true // Allow on error to prevent blocking legitimate users
+    }
+  }
+
+  /**
+   * Check if account is blocked due to failed attempts
+   */
+  private async checkAccountBlocked(email: string): Promise<boolean> {
+    try {
+      const ipAddress = await this.getClientIP()
+      
+      const { data, error } = await supabase.rpc('is_account_blocked', {
+        p_email: email,
+        p_ip_address: ipAddress
+      })
+
+      return !error && data === true
+    } catch (error) {
+      console.error('Account block check error:', error)
+      return false
+    }
+  }
+
+  /**
+   * Record failed login attempt
+   */
+  private async recordFailedLogin(email: string): Promise<void> {
+    try {
+      const ipAddress = await this.getClientIP()
+      const userAgent = navigator?.userAgent || 'unknown'
+
+      await supabase.rpc('record_failed_login', {
+        p_email: email,
+        p_ip_address: ipAddress,
+        p_user_agent: userAgent
+      })
+    } catch (error) {
+      console.error('Failed to record failed login:', error)
+    }
+  }
+
+  /**
+   * Clear failed login attempts after successful login
+   */
+  private async clearFailedLoginAttempts(email: string): Promise<void> {
+    try {
+      const ipAddress = await this.getClientIP()
+      
+      await supabase.rpc('clear_failed_login_attempts', {
+        p_email: email,
+        p_ip_address: ipAddress
+      })
+    } catch (error) {
+      console.error('Failed to clear failed login attempts:', error)
+    }
+  }
+
+  /**
+   * Error Handling Methods
+   */
+
+  /**
+   * Handle authentication errors with proper classification and logging
+   */
+  private async handleAuthError(
+    error: any, 
+    context: ErrorContext, 
+    requestId?: string
+  ): Promise<AuthResult> {
+    const authError = authErrorHandler.createError(error, context, requestId)
+    
+    // Log error for monitoring
+    console.error('Authentication Error:', authErrorHandler.formatForLogging(authError, context))
+    
+    // Log security event
+    await this.logSecurityEvent({
+      event_type: `${context.action}_error`,
+      email: context.email,
+      ip_address: context.ipAddress,
+      user_agent: context.userAgent,
+      success: false,
+      error_message: authError.message,
+      metadata: {
+        error_type: authError.type,
+        severity: authErrorHandler.getSeverity(authError.type),
+        retryable: authError.retryable,
+        request_id: requestId,
+        ...context.metadata
+      }
+    })
+
+    return {
+      success: false,
+      error: authError.userMessage,
+      errorType: authError.type,
+      retryable: authError.retryable,
+      retryAfter: authError.retryAfter
+    }
+  }
+
+  /**
+   * Generate request ID for error tracking
+   */
+  private generateRequestId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * Utility Methods
+   */
+
+  /**
+   * Generate secure token
+   */
+  private generateSecureToken(): string {
+    const array = new Uint8Array(32)
+    crypto.getRandomValues(array)
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  /**
+   * Hash token for secure storage
+   */
+  private async hashToken(token: string): Promise<string> {
+    if (!token) return ''
+    
+    const encoder = new TextEncoder()
+    const data = encoder.encode(token)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  /**
+   * Get client IP address
+   */
+  private async getClientIP(): Promise<string> {
+    try {
+      // This would typically be set by your CDN/proxy
+      // For now, return a placeholder
+      return 'client'
+    } catch (error) {
+      return 'unknown'
+    }
+  }
+
+  /**
+   * Log security event
+   */
+  private async logSecurityEvent(event: any): Promise<void> {
+    try {
+      await supabase
+        .from('security_events')
+        .insert({
+          ...event,
+          created_at: new Date().toISOString()
+        })
+    } catch (error) {
+      console.error('Security event logging error:', error)
+    }
+  }
+
+  /**
+   * Get session information
+   */
+  getSessionInfo(): SessionInfo | null {
+    return this.sessionInfo
+  }
+
+  /**
+   * Check if session is valid
+   */
+  async isSessionValid(): Promise<boolean> {
+    return await this.validateSession()
+  }
+
+  /**
+   * Force session refresh
+   */
+  async refreshSession(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase.auth.refreshSession()
+      
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      if (data.session) {
+        this.currentSession = data.session
+        await this.updateSessionActivity()
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('Session refresh error:', error)
+      return { success: false, error: 'Failed to refresh session' }
     }
   }
 }
