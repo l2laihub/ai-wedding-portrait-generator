@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
 
 export const useTheme = () => {
-  // Initialize theme immediately from localStorage or default to light
+  // Initialize theme immediately from localStorage or default to system
   const getInitialTheme = (): Theme => {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('wedai-theme') as Theme | null;
-      return savedTheme || 'light';
+      return savedTheme || 'system';
     }
-    return 'light';
+    return 'system';
+  };
+
+  // Get the actual theme to apply (resolve system to light/dark)
+  const getResolvedTheme = (themePreference: Theme): 'light' | 'dark' => {
+    if (themePreference === 'system') {
+      if (typeof window !== 'undefined') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      return 'light';
+    }
+    return themePreference;
   };
 
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
@@ -20,7 +31,7 @@ export const useTheme = () => {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('wedai-theme') as Theme | null;
       if (!savedTheme) {
-        localStorage.setItem('wedai-theme', 'light');
+        localStorage.setItem('wedai-theme', 'system');
       }
     }
   }, []);
@@ -28,22 +39,24 @@ export const useTheme = () => {
   useEffect(() => {
     // Apply theme to document immediately
     if (typeof window !== 'undefined') {
+      const resolvedTheme = getResolvedTheme(theme);
+      
       // Remove all theme classes first
       document.documentElement.classList.remove('dark', 'light');
       document.body.classList.remove('dark', 'light');
       
-      // Add the current theme class
-      document.documentElement.classList.add(theme);
-      document.body.classList.add(theme);
+      // Add the resolved theme class
+      document.documentElement.classList.add(resolvedTheme);
+      document.body.classList.add(resolvedTheme);
       
       // Update meta theme color
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', theme === 'dark' ? '#1F2937' : '#3B82F6');
+        metaThemeColor.setAttribute('content', resolvedTheme === 'dark' ? '#1F2937' : '#3B82F6');
       }
       
       // Update body background immediately for smooth transition
-      document.body.style.backgroundColor = theme === 'dark' ? '#111827' : '#f8fafc';
+      document.body.style.backgroundColor = resolvedTheme === 'dark' ? '#111827' : '#f8fafc';
       
       // Force Tailwind to re-scan for classes (if using CDN)
       try {
@@ -56,29 +69,61 @@ export const useTheme = () => {
     }
   }, [theme]);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
+  // Listen for system theme changes when using system theme
+  useEffect(() => {
+    if (theme === 'system' && typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => {
+        // Trigger a re-render by updating a dummy state or just force re-application
+        const resolvedTheme = getResolvedTheme('system');
+        document.documentElement.classList.remove('dark', 'light');
+        document.body.classList.remove('dark', 'light');
+        document.documentElement.classList.add(resolvedTheme);
+        document.body.classList.add(resolvedTheme);
+        document.body.style.backgroundColor = resolvedTheme === 'dark' ? '#111827' : '#f8fafc';
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [theme]);
+
+  const setThemePreference = (newTheme: Theme) => {
+    console.log('Setting theme to:', newTheme);
     setTheme(newTheme);
     localStorage.setItem('wedai-theme', newTheme);
   };
 
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setThemePreference(newTheme);
+  };
+
   const setLightTheme = () => {
-    setTheme('light');
-    localStorage.setItem('wedai-theme', 'light');
+    setThemePreference('light');
   };
 
   const setDarkTheme = () => {
-    setTheme('dark');
-    localStorage.setItem('wedai-theme', 'dark');
+    setThemePreference('dark');
   };
+
+  const setSystemTheme = () => {
+    setThemePreference('system');
+  };
+
+  const resolvedTheme = getResolvedTheme(theme);
 
   return {
     theme,
+    resolvedTheme,
     isLoading,
     toggleTheme,
+    setTheme: setThemePreference,
     setLightTheme,
     setDarkTheme,
-    isDark: theme === 'dark',
-    isLight: theme === 'light'
+    setSystemTheme,
+    isDark: resolvedTheme === 'dark',
+    isLight: resolvedTheme === 'light',
+    isSystem: theme === 'system'
   };
 };

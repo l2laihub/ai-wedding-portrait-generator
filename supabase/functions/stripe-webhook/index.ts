@@ -4,7 +4,9 @@ import Stripe from 'https://esm.sh/stripe@14.21.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
+  'Access-Control-Max-Age': '86400',
 }
 
 serve(async (req) => {
@@ -12,6 +14,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Allow webhook access - Stripe webhooks don't send authorization headers
+  // We rely on webhook signature verification for security instead
 
   // Initialize Stripe with the secret key
   const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
@@ -47,7 +52,7 @@ serve(async (req) => {
 
   try {
     const body = await req.text()
-    const event = stripe.webhooks.constructEvent(body, signature, endpointSecret)
+    const event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret)
     
     console.log(`Received webhook: ${event.type} (${event.id})`)
 
@@ -62,12 +67,29 @@ serve(async (req) => {
         const session = event.data.object as Stripe.Checkout.Session
         console.log('Payment successful for session:', session.id)
         
-        // Extract metadata
-        const userId = session.metadata?.user_id
+        // Extract metadata and try customer lookup as fallback
+        let userId = session.metadata?.user_id
         const amountTotal = session.amount_total || 0
         
+        // If no user_id in metadata, try to find it via customer lookup
+        if (!userId && session.customer) {
+          console.log('No user_id in metadata, looking up customer:', session.customer)
+          const { data: customerData, error: customerError } = await supabase
+            .from('stripe_customers')
+            .select('user_id')
+            .eq('stripe_customer_id', session.customer)
+            .single()
+          
+          if (customerData && !customerError) {
+            userId = customerData.user_id
+            console.log('Found user_id via customer lookup:', userId)
+          } else {
+            console.error('Customer lookup failed:', customerError)
+          }
+        }
+        
         if (!userId) {
-          console.error('No user_id found in session metadata')
+          console.error('No user_id found in session metadata or customer lookup')
           break
         }
         

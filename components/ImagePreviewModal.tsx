@@ -1,14 +1,26 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { generatePortraitFilename } from '../utils/filenameUtils';
 
 interface ImagePreviewModalProps {
   imageUrl: string;
   title: string;
   isOpen: boolean;
   onClose: () => void;
+  photoType?: 'single' | 'couple' | 'family';
+  familyMemberCount?: number;
+  style?: string;
 }
 
-const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, title, isOpen, onClose }) => {
+const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ 
+  imageUrl, 
+  title, 
+  isOpen, 
+  onClose, 
+  photoType = 'couple', 
+  familyMemberCount,
+  style 
+}) => {
   useEffect(() => {
     console.log('ImagePreviewModal render', { isOpen, imageUrl, title });
     
@@ -69,7 +81,11 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ imageUrl, title, 
         <div className="flex justify-center gap-4 p-4">
           <a
             href={imageUrl}
-            download={`${title.replace(/\s+/g, '_')}.jpg`}
+            download={generatePortraitFilename({
+              photoType,
+              familyMemberCount,
+              style: style || title.replace(' Wedding Portrait', '')
+            })}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
             onClick={(e) => e.stopPropagation()}
           >

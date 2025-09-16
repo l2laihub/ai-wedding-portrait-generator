@@ -5,32 +5,32 @@ import { useViewport } from '../hooks/useViewport';
 import { useLazyImage } from '../hooks/useIntersectionObserver';
 import { useTouch } from '../hooks/useTouch';
 import { posthogService } from '../services/posthogService';
+import { generatePortraitFilename } from '../utils/filenameUtils';
 import ImagePreviewModal from './ImagePreviewModal';
 import SwipeableGallery from './SwipeableGallery';
 
 interface ImageDisplayProps {
   contents: GeneratedContent[];
   generationId?: string;
+  photoType?: 'single' | 'couple' | 'family';
+  familyMemberCount?: number;
 }
 
-// Helper function to generate timestamp
-const generateTimestamp = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  
-  // Format: YYYY-MM-DD_HH-MM-SS
-  return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
-};
+// Note: generatePortraitFilename utility now handles consistent naming
 
-// Download handler with timestamp and tracking
-const handleDownload = async (imageUrl: string, style: string, generationId?: string) => {
-  const timestamp = generateTimestamp();
-  const filename = `wedding-portrait-${style.toLowerCase().replace(/ /g, '-')}_${timestamp}.png`;
+// Download handler with consistent filename and tracking
+const handleDownload = async (
+  imageUrl: string, 
+  style: string, 
+  generationId?: string,
+  photoType: 'single' | 'couple' | 'family' = 'couple',
+  familyMemberCount?: number
+) => {
+  const filename = generatePortraitFilename({
+    photoType,
+    familyMemberCount,
+    style
+  });
   
   // Track download event
   posthogService.trackImageDownloaded(style, generationId || 'unknown');
@@ -43,13 +43,21 @@ const handleDownload = async (imageUrl: string, style: string, generationId?: st
   document.body.removeChild(link);
 };
 
-// Share handler with native API support and timestamp
-const handleShare = async (imageUrl: string, style: string) => {
+// Share handler with native API support and consistent filename
+const handleShare = async (
+  imageUrl: string, 
+  style: string,
+  photoType: 'single' | 'couple' | 'family' = 'couple',
+  familyMemberCount?: number
+) => {
   try {
     // Try native share API first (mobile)
     if (navigator.share) {
-      const timestamp = generateTimestamp();
-      const filename = `wedding-portrait-${style.toLowerCase().replace(/ /g, '-')}_${timestamp}.png`;
+      const filename = generatePortraitFilename({
+        photoType,
+        familyMemberCount,
+        style
+      });
       
       const response = await fetch(imageUrl);
       const blob = await response.blob();
@@ -115,7 +123,13 @@ const LazyImage: React.FC<{ src: string; alt: string; className: string }> = ({ 
   );
 };
 
-const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; generationId?: string }> = ({ content, index, generationId }) => {
+const GeneratedImageCard: React.FC<{ 
+  content: GeneratedContent; 
+  index: number; 
+  generationId?: string;
+  photoType?: 'single' | 'couple' | 'family';
+  familyMemberCount?: number;
+}> = ({ content, index, generationId, photoType = 'couple', familyMemberCount }) => {
   const { imageUrl, text, style = 'portrait' } = content;
   const { isMobile } = useViewport();
   const [showActions, setShowActions] = useState(false);
@@ -124,15 +138,15 @@ const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; g
 
   const handleDownloadClick = useCallback(() => {
     if (imageUrl) {
-      handleDownload(imageUrl, style, generationId);
+      handleDownload(imageUrl, style, generationId, photoType, familyMemberCount);
     }
-  }, [imageUrl, style, generationId]);
+  }, [imageUrl, style, generationId, photoType, familyMemberCount]);
 
   const handleShareClick = useCallback(() => {
     if (imageUrl) {
-      handleShare(imageUrl, style);
+      handleShare(imageUrl, style, photoType, familyMemberCount);
     }
-  }, [imageUrl, style]);
+  }, [imageUrl, style, photoType, familyMemberCount]);
 
   // Track when style is viewed (image loads successfully)
   useEffect(() => {
@@ -318,13 +332,16 @@ const GeneratedImageCard: React.FC<{ content: GeneratedContent; index: number; g
             console.log('Closing preview modal');
             setShowPreview(false);
           }}
+          photoType={photoType}
+          familyMemberCount={familyMemberCount}
+          style={style}
         />
       )}
     </div>
   );
 };
 
-const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId }) => {
+const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId, photoType = 'couple', familyMemberCount }) => {
   const { isMobile } = useViewport();
 
   if (!contents || contents.length === 0) {
@@ -341,6 +358,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId }) =
         <SwipeableGallery
           contents={contents}
           generationId={generationId}
+          photoType={photoType}
+          familyMemberCount={familyMemberCount}
         />
       </div>
     );
@@ -364,6 +383,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({ contents, generationId }) =
             content={content} 
             index={index}
             generationId={generationId}
+            photoType={photoType}
+            familyMemberCount={familyMemberCount}
           />
         ))}
       </div>

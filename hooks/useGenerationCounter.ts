@@ -27,6 +27,11 @@ export function useGenerationCounter(): UseGenerationCounterReturn {
     // Get initial values
     setMetrics(counterService.getMetrics());
     setStatistics(counterService.getStatistics());
+    
+    // Force refresh from database on mount to get latest data
+    counterService.forceRefreshFromDatabase().catch(err => 
+      console.warn('Initial database refresh failed:', err)
+    );
 
     // Cleanup subscription on unmount
     return unsubscribe;

@@ -20,6 +20,8 @@ import { creditsService } from './services/creditsService';
 import { supabase } from './services/supabaseClient';
 import LoginModal from './components/LoginModal';
 import UserProfile from './components/UserProfile';
+import HelpSupportModal from './components/HelpSupportModal';
+import SettingsModal from './components/SettingsModal';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { 
@@ -36,6 +38,11 @@ import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { posthogService } from './services/posthogService';
 import { counterService } from './services/counterService';
 // import { useAppFeatureFlags, FEATURE_FLAGS } from './hooks/useFeatureFlags';
+
+// Import admin utilities for debugging (development only)
+if (process.env.NODE_ENV === 'development') {
+  import('./utils/adminCounterUtils');
+}
 
 const ALL_WEDDING_STYLES = [
   "Bohemian Beach Wedding",
@@ -118,6 +125,8 @@ function App({ navigate }: AppProps) {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [showPricingModal, setShowPricingModal] = useState<boolean>(false);
+  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
+  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showSuccessPage, setShowSuccessPage] = useState<boolean>(false);
   const [successSessionId, setSuccessSessionId] = useState<string | null>(null);
   const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
@@ -747,6 +756,8 @@ function App({ navigate }: AppProps) {
       <SimpleHeader 
         onLogin={handleLogin}
         onProfile={() => setShowProfileModal(true)}
+        onHelp={() => setShowHelpModal(true)}
+        onSettings={() => setShowSettingsModal(true)}
       />
       
       <main className={getMainClasses()}>
@@ -839,7 +850,12 @@ function App({ navigate }: AppProps) {
           )}
 
           {generatedContents && (
-            <SuspenseImageDisplay contents={generatedContents} generationId={currentGenerationId} />
+            <SuspenseImageDisplay 
+              contents={generatedContents} 
+              generationId={currentGenerationId}
+              photoType={photoType}
+              familyMemberCount={familyMemberCount}
+            />
           )}
 
           {/* Upgrade Prompt or How it works - only show when no image uploaded */}
@@ -911,7 +927,7 @@ function App({ navigate }: AppProps) {
 
           {/* Buy More Credits - Show for authenticated users at bottom */}
           {isAuthenticated && user && (
-            <div className="mt-12">
+            <div className="mt-12 max-w-3xl mx-auto">
               <UpgradePrompt 
                 variant="banner"
                 onJoinWaitlist={() => setShowLimitModal(true)}
@@ -1002,6 +1018,18 @@ function App({ navigate }: AppProps) {
         onPurchase={handlePurchase}
         user={user}
         isAuthenticated={isAuthenticated}
+      />
+
+      {/* Help & Support Modal */}
+      <HelpSupportModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
       />
     </div>
   );

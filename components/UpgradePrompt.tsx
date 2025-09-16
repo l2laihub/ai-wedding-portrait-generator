@@ -71,15 +71,15 @@ const UpgradePrompt: React.FC<UpgradePromptProps> = ({
     setSelectedPlan(planId);
 
     try {
-      // Create checkout session - use direct URL in development
-      const apiUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3001/api/checkout/create'
-        : '/api/checkout/create';
+      // Create checkout session using Supabase Edge Function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
         
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           priceId,

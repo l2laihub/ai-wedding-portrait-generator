@@ -52,22 +52,21 @@ const SuccessPage: React.FC<SuccessPageProps> = ({ sessionId, onComplete }) => {
         console.log('Payment successful, session ID:', sessionId);
         console.log('Adding credits for user:', user.id);
 
-        // Call the database function to verify payment and add credits
-        const { data, error: dbError } = await supabase.rpc('verify_payment_and_add_credits', {
-          p_session_id: sessionId,
+        // Payment was successful - webhook will handle credit addition
+        // Check if credits were already added by webhook
+        const { data: creditData, error: creditError } = await supabase.rpc('get_user_credits_with_reset', {
           p_user_id: user.id
         });
 
-        if (dbError) {
-          console.error('Database error adding credits:', dbError);
-          // Don't throw error - payment was successful even if credits weren't added
-          // Webhook will handle it later
-        } else if (data?.success) {
-          console.log('Credits added successfully:', data);
-          setCreditsAdded(data.credits_added || 25);
+        if (creditError) {
+          console.error('Error checking credits:', creditError);
+          // Show generic success - credits will be added by webhook
+          setCreditsAdded(null);
         } else {
-          console.log('Credits may have already been added:', data);
-          setCreditsAdded(25); // Show success anyway
+          // Display current credit balance for user reference
+          const totalCredits = (creditData[0]?.ret_paid_credits || 0) + (creditData[0]?.ret_bonus_credits || 0);
+          console.log('Current credit balance:', totalCredits);
+          setCreditsAdded(totalCredits > 0 ? totalCredits : null);
         }
 
         setIsProcessing(false);
@@ -131,13 +130,11 @@ const SuccessPage: React.FC<SuccessPageProps> = ({ sessionId, onComplete }) => {
           Thank you for your purchase! Your payment has been processed successfully.
         </p>
 
-        {creditsAdded && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-            <p className="text-green-800 font-medium">
-              {creditsAdded} credits added to your account!
-            </p>
-          </div>
-        )}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+          <p className="text-green-800 font-medium">
+            {creditsAdded ? `Credits added! Current balance: ${creditsAdded}` : 'Credits are being processed and will appear shortly in your account!'}
+          </p>
+        </div>
 
         <div className="space-y-3 mb-6">
           <div className="flex items-center justify-between text-sm">

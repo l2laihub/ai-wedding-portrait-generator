@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { authService, AuthUser } from '../services/authService';
 import { rateLimiter } from '../utils/rateLimiter';
+import { creditsService, CreditBalance } from '../services/creditsService';
 
 interface UserProfileProps {
   isOpen: boolean;
@@ -27,13 +28,26 @@ const UserProfile: React.FC<UserProfileProps> = ({
     total: 0,
     percentage: 0
   });
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       // Update usage stats when modal opens
       setUsageStats(rateLimiter.getUsageStats());
+      
+      // Load comprehensive credit balance
+      loadCreditBalance();
     }
   }, [isOpen]);
+
+  const loadCreditBalance = async () => {
+    try {
+      const balance = await creditsService.getBalance();
+      setCreditBalance(balance);
+    } catch (error) {
+      console.error('Failed to load credit balance:', error);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,13 +124,14 @@ const UserProfile: React.FC<UserProfileProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-4 pt-8 pb-20 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-4 animate-in fade-in duration-200 overflow-y-auto"
       onClick={handleBackdropClick}
       style={{ paddingTop: 'max(2rem, env(safe-area-inset-top))' }}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 my-8 animate-in zoom-in-95 duration-200 flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: 'calc(100vh - 4rem)' }}
       >
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
@@ -135,7 +150,7 @@ const UserProfile: React.FC<UserProfileProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Success Message */}
           {success && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg p-3">
@@ -218,30 +233,103 @@ const UserProfile: React.FC<UserProfileProps> = ({
             )}
           </div>
 
-          {/* Usage Stats */}
+          {/* Credit Balance & Usage */}
           <div className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Today's Usage</h4>
-            
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Free portraits</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {usageStats.used}/{usageStats.total}
-              </span>
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Icon path="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                Credits & Usage
+              </h4>
+              <button
+                onClick={loadCreditBalance}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                title="Refresh credit balance"
+              >
+                <Icon path="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              </button>
             </div>
             
-            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mb-3">
-              <div 
-                className="bg-gradient-to-r from-blue-500 to-teal-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${usageStats.percentage}%` }}
-              />
-            </div>
+            {creditBalance ? (
+              <div className="space-y-3">
+                {/* Total Available Credits */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Available</span>
+                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    {creditBalance.totalAvailable} credits
+                  </span>
+                </div>
+                
+                {/* Credit Breakdown */}
+                <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                  {creditBalance.freeRemaining > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Free daily</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {creditBalance.freeRemaining}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {creditBalance.paidCredits > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Purchased</span>
+                      <span className="font-medium text-blue-600 dark:text-blue-400">
+                        {creditBalance.paidCredits}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {creditBalance.bonusCredits > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Bonus</span>
+                      <span className="font-medium text-purple-600 dark:text-purple-400">
+                        {creditBalance.bonusCredits}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {usageStats.remaining > 0 
-                ? `${usageStats.remaining} portraits remaining today`
-                : 'Daily limit reached. Resets at midnight PT.'
-              }
-            </p>
+                {/* Daily Usage Progress */}
+                {creditBalance.freeCreditsUsedToday > 0 && (
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Today's free usage</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {creditBalance.freeCreditsUsedToday}/5
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                      <div 
+                        className="bg-gradient-to-r from-green-400 to-blue-500 h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${(creditBalance.freeCreditsUsedToday / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Message */}
+                <div className="pt-2">
+                  {creditBalance.totalAvailable === 0 ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      No credits remaining. Purchase more to continue creating!
+                    </p>
+                  ) : creditBalance.totalAvailable <= 5 ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Running low on credits. Consider purchasing more.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      Ready to create amazing portraits!
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading credits...</span>
+              </div>
+            )}
           </div>
 
           {/* Referral Section */}

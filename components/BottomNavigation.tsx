@@ -63,7 +63,8 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
   if (!isMobile) return null;
 
   const handleTabPress = (tabId: string) => {
-    if (tabId !== activeTab) {
+    // Always trigger tab change for signin to allow reopening modal
+    if (tabId === 'signin' || tabId !== activeTab) {
       triggerHaptic('light');
       onTabChange(tabId);
     }

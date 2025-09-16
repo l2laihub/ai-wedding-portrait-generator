@@ -24,6 +24,8 @@ import ImagePreviewModal from './ImagePreviewModal';
 import MaintenanceBanner from './MaintenanceBanner';
 import UpgradePrompt from './UpgradePrompt';
 import PricingModal from './PricingModal';
+import HelpSupportModal from './HelpSupportModal';
+import SettingsModal from './SettingsModal';
 
 // Skeleton components
 import {
@@ -126,6 +128,8 @@ const MobileApp: React.FC<MobileAppProps> = ({
   const [currentTab, setCurrentTab] = useState('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
@@ -201,15 +205,15 @@ const MobileApp: React.FC<MobileAppProps> = ({
     }
 
     try {
-      // Create checkout session - use direct URL in development
-      const apiUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3001/api/checkout/create'
-        : '/api/checkout/create';
+      // Create checkout session using Supabase Edge Function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
         
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           priceId,
@@ -241,28 +245,11 @@ const MobileApp: React.FC<MobileAppProps> = ({
     setCurrentTab(tabId);
     
     switch (tabId) {
-      case 'gallery':
-        if (!isAuthenticated) {
-          // Show login modal for unauthenticated users accessing gallery
-          showInfo('Please sign in to access your gallery');
-          setShowLoginModal(true);
-          return;
-        }
-        
-        if (generatedContents && generatedContents.length > 0) {
-          // Scroll to gallery
-          const galleryElement = document.querySelector('.swipeable-gallery');
-          galleryElement?.scrollIntoView({ behavior: 'smooth' });
-          showInfo('Viewing your generated portraits');
-        } else {
-          // No gallery content, show message and switch back to home
-          showInfo('No portraits generated yet. Create some portraits first!');
-          setCurrentTab('home');
-        }
-        break;
       case 'create':
-        // Reset state to show upload UI
+        // Reset state to show upload UI and scroll to top
         resetState();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        showInfo('Ready to create new portraits!');
         break;
       case 'profile':
         if (isAuthenticated) {
@@ -274,6 +261,12 @@ const MobileApp: React.FC<MobileAppProps> = ({
       case 'signin':
         setShowLoginModal(true);
         break;
+      case 'help':
+        setShowHelpModal(true);
+        break;
+      case 'settings':
+        setShowSettingsModal(true);
+        break;
     }
   };
 
@@ -284,11 +277,6 @@ const MobileApp: React.FC<MobileAppProps> = ({
         id: 'home',
         label: 'Home',
         icon: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'
-      },
-      {
-        id: 'gallery',
-        label: 'Gallery',
-        icon: 'M22 16V4c0-1.11-.89-2-2-2H8c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.11.89 2 2 2h14v-2H4V6H2z'
       },
       {
         id: 'create',
@@ -328,6 +316,8 @@ const MobileApp: React.FC<MobileAppProps> = ({
         headerTitle="Generating Portraits..."
         navigate={navigate}
         navigationItems={getNavigationItems()}
+        onHelpClick={() => setShowHelpModal(true)}
+        onSettingsClick={() => setShowSettingsModal(true)}
       >
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
           {/* Show current photo being processed */}
@@ -368,6 +358,8 @@ const MobileApp: React.FC<MobileAppProps> = ({
         headerTitle="WedAI"
         navigate={navigate}
         navigationItems={getNavigationItems()}
+        onHelpClick={() => setShowHelpModal(true)}
+        onSettingsClick={() => setShowSettingsModal(true)}
       >
       <div className="space-y-6 p-4">
         {/* Photo Type Selector */}
@@ -622,10 +614,16 @@ const MobileApp: React.FC<MobileAppProps> = ({
       
       <LoginModal 
         isOpen={showLoginModal && !isMaintenanceMode}
-        onClose={() => setShowLoginModal(false)}
+        onClose={() => {
+          setShowLoginModal(false);
+          // Reset tab to home when modal closes to prevent signin button staying highlighted
+          setCurrentTab('home');
+        }}
         onSuccess={() => {
           setShowLoginModal(false);
           showSuccess('Logged in successfully!');
+          // Reset tab to home after successful login
+          setCurrentTab('home');
         }}
         defaultMode={loginMode}
       />
@@ -633,7 +631,11 @@ const MobileApp: React.FC<MobileAppProps> = ({
       {user && (
         <UserProfile
           isOpen={showProfileModal && !isMaintenanceMode}
-          onClose={() => setShowProfileModal(false)}
+          onClose={() => {
+            setShowProfileModal(false);
+            // Reset tab to home when profile modal closes
+            setCurrentTab('home');
+          }}
           user={user}
           onSignOut={signOut}
         />
@@ -646,6 +648,24 @@ const MobileApp: React.FC<MobileAppProps> = ({
         onPurchase={handlePurchase}
         user={user}
         isAuthenticated={isAuthenticated}
+      />
+
+      {/* Help & Support Modal */}
+      <HelpSupportModal
+        isOpen={showHelpModal && !isMaintenanceMode}
+        onClose={() => {
+          setShowHelpModal(false);
+          setCurrentTab('home'); // Reset tab when modal closes
+        }}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal && !isMaintenanceMode}
+        onClose={() => {
+          setShowSettingsModal(false);
+          setCurrentTab('home'); // Reset tab when modal closes
+        }}
       />
 
       {/* Toast Manager */}

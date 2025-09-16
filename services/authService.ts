@@ -194,6 +194,9 @@ class AuthService {
    */
   async signUp(data: SignUpData): Promise<AuthResult> {
     try {
+      console.log('Attempting signup for:', data.email)
+      console.log('Supabase URL:', supabase.supabaseUrl)
+      
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -201,11 +204,27 @@ class AuthService {
           data: {
             display_name: data.displayName || '',
             referral_code: data.referralCode || ''
-          }
+          },
+          emailRedirectTo: `${window.location.origin}`
         }
       })
 
       if (authError) {
+        console.error('SignUp auth error:', {
+          message: authError.message,
+          status: authError.status,
+          code: authError.code || 'NO_CODE',
+          details: authError
+        })
+        
+        // Handle gateway timeout - email might have been sent successfully
+        if (authError.status === 504) {
+          return { 
+            success: true, 
+            error: 'Account created! Please check your email to confirm your account. The confirmation may take a few minutes to arrive.' 
+          }
+        }
+        
         return { success: false, error: authError.message }
       }
 
@@ -221,12 +240,46 @@ class AuthService {
         }
       }
 
-      // Load user profile
-      await this.loadUserProfile(authData.user.id)
+      // Wait a moment for the database trigger to create the profile
+      // This prevents race conditions between trigger execution and profile loading
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Load user profile with retry logic
+      let retries = 3
+      let profileLoaded = false
+      
+      while (retries > 0 && !profileLoaded) {
+        try {
+          await this.loadUserProfile(authData.user.id)
+          profileLoaded = !!this.currentUser
+        } catch (error) {
+          console.log(`Profile load attempt ${4 - retries} failed, retrying...`)
+        }
+        
+        if (!profileLoaded) {
+          retries--
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500))
+          }
+        }
+      }
+      
+      if (!profileLoaded) {
+        console.warn('Failed to load user profile after multiple attempts')
+      }
 
       return { success: true, user: this.currentUser || undefined }
     } catch (err) {
       console.error('Sign up error:', err)
+      
+      // Check if this is a network error
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        })
+      }
       return { success: false, error: 'Sign up failed. Please try again.' }
     }
   }

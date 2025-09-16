@@ -24,6 +24,8 @@ interface MobileAppShellProps {
   className?: string;
   navigate?: (route: 'home' | 'privacy' | 'terms') => void;
   navigationItems?: NavItem[];
+  onHelpClick?: () => void;
+  onSettingsClick?: () => void;
 }
 
 const MobileAppShell: React.FC<MobileAppShellProps> = ({
@@ -36,7 +38,9 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   headerTitle = 'WedAI',
   className = '',
   navigate,
-  navigationItems
+  navigationItems,
+  onHelpClick,
+  onSettingsClick
 }) => {
   const { isMobile, orientation } = useViewport();
   const { isOnline } = useNetworkStatus();
@@ -299,6 +303,8 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         navigate={navigate}
+        onHelpClick={onHelpClick}
+        onSettingsClick={onSettingsClick}
       />
 
       {/* Offline indicator toast */}

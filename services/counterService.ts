@@ -1,4 +1,6 @@
 import { posthogService, EventName } from './posthogService';
+import { databaseService } from './databaseService';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 // Counter storage keys
 const STORAGE_KEYS = {
@@ -46,46 +48,98 @@ class CounterService {
   }
 
   /**
-   * Load metrics from localStorage
+   * Load metrics from database (preferred) or localStorage fallback
    */
   private loadMetrics(): CounterMetrics {
+    const defaultMetrics = {
+      totalGenerations: 0,
+      dailyGenerations: 0,
+      lastResetDate: new Date().toISOString().split('T')[0],
+      generationHistory: [],
+    };
+
     try {
-      // Set realistic baseline values - app released YESTERDAY with 2k requests today
-      // Assuming ~3 API calls per user generation session (3 styles generated)
-      const BASELINE_TOTAL = 950;   // Realistic: ~200 yesterday + ~750 today
-      const BASELINE_DAILY = 650;   // Today's estimate: ~2k requests ÷ 3 styles = ~650 generations
-      
-      const storedTotal = localStorage.getItem(STORAGE_KEYS.TOTAL_GENERATIONS);
-      const storedDaily = localStorage.getItem(STORAGE_KEYS.DAILY_GENERATIONS);
-      
-      // Use stored values if they exist and are higher than baseline, otherwise use baseline
-      const totalGenerations = Math.max(
-        parseInt(storedTotal || '0', 10),
-        BASELINE_TOTAL
-      );
-      const dailyGenerations = Math.max(
-        parseInt(storedDaily || '0', 10), 
-        BASELINE_DAILY
-      );
-      
-      const lastResetDate = localStorage.getItem(STORAGE_KEYS.LAST_RESET_DATE) || new Date().toISOString().split('T')[0];
+      // Load from localStorage for immediate display
       const historyJson = localStorage.getItem(STORAGE_KEYS.GENERATION_HISTORY) || '[]';
       const generationHistory = JSON.parse(historyJson) as GenerationHistoryEntry[];
+      const lastResetDate = localStorage.getItem(STORAGE_KEYS.LAST_RESET_DATE) || new Date().toISOString().split('T')[0];
+      
+      // Try to load from localStorage first for immediate display
+      const storedTotal = parseInt(localStorage.getItem(STORAGE_KEYS.TOTAL_GENERATIONS) || '0', 10);
+      const storedDaily = parseInt(localStorage.getItem(STORAGE_KEYS.DAILY_GENERATIONS) || '0', 10);
 
-      return {
-        totalGenerations,
-        dailyGenerations,
+      const metrics = {
+        totalGenerations: storedTotal,
+        dailyGenerations: storedDaily,
         lastResetDate,
-        generationHistory: generationHistory.slice(-100), // Keep last 100 entries
+        generationHistory: generationHistory.slice(-100),
       };
+
+      // Asynchronously refresh from database
+      this.refreshFromDatabase();
+
+      return metrics;
     } catch (error) {
       console.error('Error loading counter metrics:', error);
-      return {
-        totalGenerations: 950,   // Fallback to day-old app baseline
-        dailyGenerations: 650,   // Fallback to today's usage baseline
-        lastResetDate: new Date().toISOString().split('T')[0],
-        generationHistory: [],
-      };
+      return defaultMetrics;
+    }
+  }
+
+  /**
+   * Refresh metrics from database and sync with localStorage
+   */
+  private async refreshFromDatabase(): Promise<void> {
+    try {
+      if (!isSupabaseConfigured()) {
+        console.log('Database not configured, using localStorage only');
+        return;
+      }
+
+      // Query admin_stats view for accurate counts
+      const { data: adminStats, error } = await supabase
+        .from('admin_stats')
+        .select('total_generations, today_generations')
+        .single();
+
+      if (error) {
+        console.warn('Failed to fetch admin stats, falling back to databaseService:', error);
+        // Fallback to databaseService method
+        const summary = await databaseService.getAnalyticsSummary();
+        this.updateMetricsFromDatabase(summary.totalGenerations, summary.todayGenerations);
+        return;
+      }
+
+      if (adminStats) {
+        this.updateMetricsFromDatabase(adminStats.total_generations || 0, adminStats.today_generations || 0);
+      }
+    } catch (error) {
+      console.warn('Error refreshing from database:', error);
+      // Try fallback method
+      try {
+        const summary = await databaseService.getAnalyticsSummary();
+        this.updateMetricsFromDatabase(summary.totalGenerations, summary.todayGenerations);
+      } catch (fallbackError) {
+        console.error('Fallback database query also failed:', fallbackError);
+      }
+    }
+  }
+
+  /**
+   * Update metrics with database values and save to localStorage
+   */
+  private updateMetricsFromDatabase(totalFromDB: number, todayFromDB: number): void {
+    // Only update if database values are higher (prevents going backwards)
+    const oldTotal = this.metrics.totalGenerations;
+    const oldDaily = this.metrics.dailyGenerations;
+    
+    this.metrics.totalGenerations = Math.max(this.metrics.totalGenerations, totalFromDB);
+    this.metrics.dailyGenerations = Math.max(this.metrics.dailyGenerations, todayFromDB);
+    
+    // If values changed, save to localStorage and notify listeners
+    if (this.metrics.totalGenerations !== oldTotal || this.metrics.dailyGenerations !== oldDaily) {
+      this.saveMetrics();
+      this.notifyListeners();
+      console.log(`Counter synced from database: ${this.metrics.totalGenerations} total, ${this.metrics.dailyGenerations} daily`);
     }
   }
 
@@ -183,19 +237,46 @@ class CounterService {
     }
   }
 
+
   /**
-   * Get current counter value
+   * Get daily generation count with automatic refresh
+   */
+  getDailyGenerations(): number {
+    this.checkDailyReset();
+    // Refresh from database periodically
+    this.refreshFromDatabaseIfStale();
+    return this.metrics.dailyGenerations;
+  }
+
+  /**
+   * Get total generation count with automatic refresh
    */
   getTotalGenerations(): number {
+    // Refresh from database periodically
+    this.refreshFromDatabaseIfStale();
     return this.metrics.totalGenerations;
   }
 
   /**
-   * Get daily generation count
+   * Refresh from database if data is stale (more than 5 minutes old)
    */
-  getDailyGenerations(): number {
-    this.checkDailyReset();
-    return this.metrics.dailyGenerations;
+  private refreshFromDatabaseIfStale(): void {
+    const lastRefresh = parseInt(localStorage.getItem('wedai_last_db_refresh') || '0', 10);
+    const now = Date.now();
+    const FIVE_MINUTES = 5 * 60 * 1000;
+
+    if (now - lastRefresh > FIVE_MINUTES) {
+      localStorage.setItem('wedai_last_db_refresh', now.toString());
+      this.refreshFromDatabase(); // Don't await, let it run in background
+    }
+  }
+
+  /**
+   * Force refresh from database (public method for manual refresh)
+   */
+  async forceRefreshFromDatabase(): Promise<void> {
+    localStorage.setItem('wedai_last_db_refresh', Date.now().toString());
+    await this.refreshFromDatabase();
   }
 
   /**
@@ -382,8 +463,7 @@ export type { GenerationHistoryEntry };
 
 // Export convenience functions for easy access
 export const getGenerationCount = () => counterService.getTotalGenerations();
-export const getDailyCount = () => counterService.getDailyCount();
-export const incrementGenerationCount = (metadata: GenerationMetadata) => 
-  counterService.incrementGeneration(metadata);
+export const getDailyCount = () => counterService.getDailyGenerations();
+export const refreshCounterFromDatabase = () => counterService.forceRefreshFromDatabase();
 export const subscribeToCounterChanges = (listener: (count: number) => void) => 
   counterService.subscribe(() => listener(counterService.getTotalGenerations()));

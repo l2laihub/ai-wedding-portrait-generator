@@ -5,19 +5,24 @@ import { useHapticFeedback } from './MobileEnhancements';
 import Icon from './Icon';
 import ImagePreviewModal from './ImagePreviewModal';
 import { posthogService } from '../services/posthogService';
+import { generatePortraitFilename } from '../utils/filenameUtils';
 
 interface SwipeableGalleryProps {
   contents: GeneratedContent[];
   generationId?: string;
   onImageTap?: (index: number) => void;
   onShowToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+  photoType?: 'single' | 'couple' | 'family';
+  familyMemberCount?: number;
 }
 
 const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
   contents,
   generationId,
   onImageTap,
-  onShowToast
+  onShowToast,
+  photoType = 'couple',
+  familyMemberCount
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showActions, setShowActions] = useState(false);
@@ -166,8 +171,11 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
     }
     
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `wedding-portrait-${content.style?.toLowerCase().replace(/ /g, '-')}_${timestamp}.png`;
+      const filename = generatePortraitFilename({
+        photoType,
+        familyMemberCount,
+        style: content.style || 'portrait'
+      });
       
       // Check if this is actually a real iOS device (not just responsive mode)
       const isRealIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -246,7 +254,12 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
       if (navigator.share) {
         const response = await fetch(content.imageUrl);
         const blob = await response.blob();
-        const file = new File([blob], 'wedding-portrait.png', { type: blob.type });
+        const filename = generatePortraitFilename({
+          photoType,
+          familyMemberCount,
+          style: content.style || 'portrait'
+        });
+        const file = new File([blob], filename, { type: blob.type });
         
         await navigator.share({
           files: [file],
@@ -471,6 +484,9 @@ const SwipeableGallery: React.FC<SwipeableGalleryProps> = ({
           title={`${currentContent.style} Wedding Portrait`}
           isOpen={showPreview}
           onClose={() => setShowPreview(false)}
+          photoType={photoType}
+          familyMemberCount={familyMemberCount}
+          style={currentContent.style}
         />
       )}
     </div>
