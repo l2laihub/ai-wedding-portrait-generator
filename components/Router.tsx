@@ -3,8 +3,10 @@ import App from '../App';
 import PrivacyPolicy from './PrivacyPolicy';
 import TermsOfService from './TermsOfService';
 import SuccessPage from './SuccessPage';
+import AdminDashboard from '../src/components/admin/AdminDashboard';
+import AdminProtectedRoute from '../src/components/admin/AdminProtectedRoute';
 
-type Route = 'home' | 'privacy' | 'terms' | 'success';
+type Route = 'home' | 'privacy' | 'terms' | 'success' | 'admin' | 'admin/users' | 'admin/alerts';
 
 const Router: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('home');
@@ -23,6 +25,18 @@ const Router: React.FC = () => {
         return;
       }
       
+      // Check for admin routes from pathname
+      if (window.location.pathname === '/admin') {
+        setCurrentRoute('admin');
+        return;
+      } else if (window.location.pathname === '/admin/users') {
+        setCurrentRoute('admin/users');
+        return;
+      } else if (window.location.pathname === '/admin/alerts') {
+        setCurrentRoute('admin/alerts');
+        return;
+      }
+      
       switch (hash) {
         case 'privacy':
           setCurrentRoute('privacy');
@@ -33,6 +47,15 @@ const Router: React.FC = () => {
         case 'success':
           setCurrentRoute('success');
           setSessionId(params.get('session_id') || undefined);
+          break;
+        case 'admin':
+          setCurrentRoute('admin');
+          break;
+        case 'admin/users':
+          setCurrentRoute('admin/users');
+          break;
+        case 'admin/alerts':
+          setCurrentRoute('admin/alerts');
           break;
         default:
           setCurrentRoute('home');
@@ -70,6 +93,15 @@ const Router: React.FC = () => {
       </button>
     </div>
   );
+
+  // Admin routes need special handling
+  if (currentRoute === 'admin' || currentRoute.startsWith('admin/')) {
+    return (
+      <AdminProtectedRoute>
+        <AdminDashboard />
+      </AdminProtectedRoute>
+    );
+  }
 
   switch (currentRoute) {
     case 'privacy':

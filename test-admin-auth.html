@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Admin Auth</title>
+</head>
+<body>
+  <h1>Admin Auth Test</h1>
+  <p>Open the browser console and run these commands to test:</p>
+  <pre>
+// 1. Check if authService is available
+authService
+
+// 2. Get current user
+authService.getCurrentUser()
+
+// 3. Check if user is admin
+authService.isAdmin()
+
+// 4. Refresh user profile to get latest role
+await authService.refreshUserProfile()
+
+// 5. Check admin status again
+authService.isAdmin()
+
+// 6. Check user role directly
+authService.getCurrentUser()?.role
+  </pre>
+  <p>To navigate to admin dashboard: <a href="/admin">Go to /admin</a></p>
+</body>
+</html>

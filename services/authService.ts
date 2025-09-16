@@ -7,6 +7,7 @@ export interface AuthUser {
   displayName?: string
   createdAt: string
   referralCode?: string
+  role?: string
 }
 
 export interface AuthResult {
@@ -46,8 +47,17 @@ class AuthService {
           email: session.user.email || '',
           displayName: session.user.user_metadata?.display_name || '',
           createdAt: session.user.created_at || new Date().toISOString(),
-          referralCode: undefined // Will be loaded separately if needed
+          referralCode: undefined, // Will be loaded separately if needed
+          role: undefined // Will be loaded separately
         }
+        
+        // Load user profile asynchronously to get role
+        this.loadUserProfileSimple(session.user.id).then(profile => {
+          if (profile && this.currentUser) {
+            this.currentUser.role = profile.role;
+            console.log('User role loaded:', profile.role);
+          }
+        })
         
         console.log('Auth state listener completed for:', this.currentUser?.email)
       } else {
@@ -80,7 +90,8 @@ class AuthService {
         email: userProfile.email,
         displayName: userProfile.display_name,
         createdAt: userProfile.created_at,
-        referralCode: userProfile.referral_code
+        referralCode: userProfile.referral_code,
+        role: userProfile.role
       }
     } catch (err) {
       console.error('Failed to load user profile:', err)
@@ -122,7 +133,8 @@ class AuthService {
         email: userProfile.email,
         displayName: userProfile.display_name,
         createdAt: userProfile.created_at,
-        referralCode: userProfile.referral_code
+        referralCode: userProfile.referral_code,
+        role: userProfile.role
       }
     } catch (err) {
       console.error('Failed to load user profile:', err)
@@ -472,6 +484,20 @@ class AuthService {
   }
 
   /**
+   * Check if user is admin
+   */
+  isAdmin(): boolean {
+    return this.currentUser?.role === 'admin' || this.currentUser?.role === 'super_admin'
+  }
+
+  /**
+   * Check if user is super admin
+   */
+  isSuperAdmin(): boolean {
+    return this.currentUser?.role === 'super_admin'
+  }
+
+  /**
    * Get session from storage (for initial load)
    */
   async getStoredSession(): Promise<Session | null> {
@@ -523,6 +549,19 @@ class AuthService {
     } catch (err) {
       console.error('OAuth callback error:', err)
       return { success: false, error: 'Authentication failed' }
+    }
+  }
+
+  /**
+   * Refresh user profile (including role)
+   */
+  async refreshUserProfile(): Promise<void> {
+    if (!this.currentUser) return;
+    
+    const profile = await this.loadUserProfileSimple(this.currentUser.id);
+    if (profile) {
+      this.currentUser = profile;
+      console.log('User profile refreshed, role:', profile.role);
     }
   }
 }
