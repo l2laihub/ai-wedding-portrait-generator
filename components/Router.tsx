@@ -3,10 +3,11 @@ import App from '../App';
 import PrivacyPolicy from './PrivacyPolicy';
 import TermsOfService from './TermsOfService';
 import SuccessPage from './SuccessPage';
+import PasswordResetPage from './PasswordResetPage';
 import AdminDashboard from '../src/components/admin/AdminDashboard';
 import AdminProtectedRoute from '../src/components/admin/AdminProtectedRoute';
 
-type Route = 'home' | 'privacy' | 'terms' | 'success' | 'admin' | 'admin/users' | 'admin/alerts';
+type Route = 'home' | 'privacy' | 'terms' | 'success' | 'reset-password' | 'admin' | 'admin/users' | 'admin/alerts';
 
 const Router: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('home');
@@ -22,6 +23,12 @@ const Router: React.FC = () => {
       if (window.location.pathname === '/success' || params.get('success') === 'true') {
         setCurrentRoute('success');
         setSessionId(params.get('session_id') || undefined);
+        return;
+      }
+      
+      // Check for password reset route from pathname
+      if (window.location.pathname === '/reset-password' || hash.includes('type=recovery')) {
+        setCurrentRoute('reset-password');
         return;
       }
       
@@ -47,6 +54,9 @@ const Router: React.FC = () => {
         case 'success':
           setCurrentRoute('success');
           setSessionId(params.get('session_id') || undefined);
+          break;
+        case 'reset-password':
+          setCurrentRoute('reset-password');
           break;
         case 'admin':
           setCurrentRoute('admin');
@@ -120,6 +130,8 @@ const Router: React.FC = () => {
       );
     case 'success':
       return <SuccessPage sessionId={sessionId} />;
+    case 'reset-password':
+      return <PasswordResetPage navigate={navigate} />;
     default:
       return <App navigate={navigate} />;
   }

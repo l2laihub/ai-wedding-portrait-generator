@@ -10,9 +10,10 @@ interface SimpleHeaderProps {
   onProfile?: () => void;
   onHelp?: () => void;
   onSettings?: () => void;
+  hideAuthButtons?: boolean;
 }
 
-const SimpleHeader: React.FC<SimpleHeaderProps> = ({ onLogin, onProfile, onHelp, onSettings }) => {
+const SimpleHeader: React.FC<SimpleHeaderProps> = ({ onLogin, onProfile, onHelp, onSettings, hideAuthButtons = false }) => {
   const { totalGenerations, dailyGenerations } = useGenerationCounter();
   const { user, isAuthenticated, isLoading } = useAuth();
   
@@ -103,57 +104,61 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({ onLogin, onProfile, onHelp,
             
             
             {/* Authentication UI */}
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <Icon path="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-4 h-4 animate-spin text-gray-500 dark:text-gray-400" />
-                </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Loading...</span>
-              </div>
-            ) : isAuthenticated && user ? (
-              /* Authenticated User */
+            {!hideAuthButtons && (
               <>
-                {/* Separator */}
-                <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                <button
-                  onClick={onProfile}
-                  className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-teal-50 dark:from-blue-900/30 dark:to-teal-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:from-blue-100 hover:to-teal-100 dark:hover:from-blue-900/40 dark:hover:to-teal-900/40 transition-all duration-300"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">
-                      {(user.displayName || user.email).charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="hidden lg:block">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user.displayName || 'User'}
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                      <Icon path="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-4 h-4 animate-spin text-gray-500 dark:text-gray-400" />
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      View Profile
-                    </div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Loading...</span>
                   </div>
-                  <Icon path="M19 9l-7 7-7-7" className="w-4 h-4 text-gray-500" />
-                </button>
-              </>
-            ) : (
-              /* Unauthenticated User */
-              <>
-                {/* Separator */}
-                <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => onLogin?.('signin')}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    onClick={() => onLogin?.('signup')}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-medium text-sm rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-[1.02]"
-                  >
-                    Sign Up
-                  </button>
-                </div>
+                ) : isAuthenticated && user ? (
+                  /* Authenticated User */
+                  <>
+                    {/* Separator */}
+                    <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                    <button
+                      onClick={onProfile}
+                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-teal-50 dark:from-blue-900/30 dark:to-teal-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:from-blue-100 hover:to-teal-100 dark:hover:from-blue-900/40 dark:hover:to-teal-900/40 transition-all duration-300"
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">
+                          {(user.displayName || user.email).charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="hidden lg:block">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {user.displayName || 'User'}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          View Profile
+                        </div>
+                      </div>
+                      <Icon path="M19 9l-7 7-7-7" className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </>
+                ) : (
+                  /* Unauthenticated User */
+                  <>
+                    {/* Separator */}
+                    <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => onLogin?.('signin')}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        onClick={() => onLogin?.('signup')}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-medium text-sm rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-[1.02]"
+                      >
+                        Sign Up
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
             
