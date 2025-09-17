@@ -34,6 +34,13 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
+  // Debug environment variables
+  console.log('🔍 LimitReachedModal Environment Debug:', {
+    VITE_STRIPE_STARTER_PRICE_ID: import.meta.env.VITE_STRIPE_STARTER_PRICE_ID,
+    VITE_STRIPE_WEDDING_PRICE_ID: import.meta.env.VITE_STRIPE_WEDDING_PRICE_ID,
+    VITE_STRIPE_PARTY_PRICE_ID: import.meta.env.VITE_STRIPE_PARTY_PRICE_ID
+  });
+
   // Use same pricing structure as PricingModal
   const pricingTiers: PricingTier[] = [
     {
@@ -42,7 +49,7 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
       description: '10 photo shoots (30 images)',
       credits: 10,
       price: 499,
-      priceId: 'price_1S7S5jBMCTqpTWpd2zgC1IPm',
+      priceId: 'price_1S80xuBBS2fcAqSN3PCh3SND',
       popular: false,
       bestValue: false,
       features: ['10 photo shoots', '30 portrait images', 'Just $0.17 per image!', 'All 12 wedding themes']
@@ -53,7 +60,7 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
       description: '25 photo shoots (75 images)',
       credits: 25,
       price: 999,
-      priceId: 'price_1S7S6gBMCTqpTWpdAPUdabYB',
+      priceId: 'price_1S80xzBBS2fcAqSNRfHmQ0Fl',
       popular: true,
       bestValue: false,
       features: ['25 photo shoots', '75 portrait images', 'Just $0.13 per image!', 'All premium themes', 'MOST POPULAR']
@@ -64,7 +71,7 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
       description: '75 photo shoots (225 images!)',
       credits: 75,
       price: 2499,
-      priceId: 'price_1S7S87BMCTqpTWpdtNWuNtjy',
+      priceId: 'price_1S80y3BBS2fcAqSNLzTop2ir',
       popular: false,
       bestValue: true,
       features: ['75 photo shoots', '225 portrait images!', 'Just $0.11 per image!', 'All exclusive themes', 'BEST VALUE']
@@ -119,6 +126,7 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
       setIsLoading(true);
       setSelectedPlan(tier.id);
       
+      console.log('🔍 LimitReachedModal: Attempting purchase with priceId:', tier.priceId);
       await onPurchase(tier.priceId, tier.id);
     } catch (error) {
       console.error('Purchase failed:', error);

@@ -39,7 +39,7 @@ const PricingModal: React.FC<PricingModalProps> = ({
       description: '10 photo shoots (30 images)',
       credits: 10,
       price: 499,
-      priceId: 'price_1S7S5jBMCTqpTWpd2zgC1IPm',
+      priceId: 'price_1S80xuBBS2fcAqSN3PCh3SND',
       popular: false,
       bestValue: false,
       features: ['10 photo shoots', '30 portrait images', 'Just $0.17 per image!', 'All 12 wedding themes']
@@ -50,7 +50,7 @@ const PricingModal: React.FC<PricingModalProps> = ({
       description: '25 photo shoots (75 images)',
       credits: 25,
       price: 999,
-      priceId: 'price_1S7S6gBMCTqpTWpdAPUdabYB',
+      priceId: 'price_1S80xzBBS2fcAqSNRfHmQ0Fl',
       popular: true,
       bestValue: false,
       features: ['25 photo shoots', '75 portrait images', 'Just $0.13 per image!', 'All premium themes', 'MOST POPULAR']
@@ -61,7 +61,7 @@ const PricingModal: React.FC<PricingModalProps> = ({
       description: '75 photo shoots (225 images!)',
       credits: 75,
       price: 2499,
-      priceId: 'price_1S7S87BMCTqpTWpdtNWuNtjy',
+      priceId: 'price_1S80y3BBS2fcAqSNLzTop2ir',
       popular: false,
       bestValue: true,
       features: ['75 photo shoots', '225 portrait images!', 'Just $0.11 per image!', 'All exclusive themes', 'BEST VALUE']

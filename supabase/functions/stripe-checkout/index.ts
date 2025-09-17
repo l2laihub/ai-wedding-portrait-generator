@@ -72,7 +72,28 @@ serve(async (req) => {
       .single()
 
     if (existingCustomer) {
-      customerId = existingCustomer.stripe_customer_id
+      try {
+        // Verify the customer exists in the current Stripe environment
+        await stripe.customers.retrieve(existingCustomer.stripe_customer_id)
+        customerId = existingCustomer.stripe_customer_id
+      } catch (customerError) {
+        console.log('Customer not found in current Stripe environment, creating new one')
+        // Customer doesn't exist in current environment, create new one
+        const customer = await stripe.customers.create({
+          email: userData.email,
+          metadata: {
+            user_id: userId
+          }
+        })
+        
+        customerId = customer.id
+
+        // Update the database with the new customer ID
+        await supabase
+          .from('stripe_customers')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', userId)
+      }
     } else {
       // Create new Stripe customer
       const customer = await stripe.customers.create({

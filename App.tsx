@@ -689,8 +689,11 @@ function App({ navigate }: AppProps) {
 
   // Authentication handlers
   const handleLogin = (mode: 'signin' | 'signup' = 'signin') => {
+    console.log('🔍 handleLogin called with mode:', mode);
+    console.log('🔍 Current showLoginModal state:', showLoginModal);
     setLoginMode(mode);
     setShowLoginModal(true);
+    console.log('🔍 setShowLoginModal(true) called');
   };
 
   const handleLoginSuccess = (user: any) => {

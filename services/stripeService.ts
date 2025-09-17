@@ -43,6 +43,14 @@ export interface CheckoutResult {
   error?: string;
 }
 
+// Debug logging
+console.log('Stripe Environment Debug:', {
+  publishable: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.slice(0, 20) + '...',
+  starter: import.meta.env.VITE_STRIPE_STARTER_PRICE_ID,
+  wedding: import.meta.env.VITE_STRIPE_WEDDING_PRICE_ID,
+  party: import.meta.env.VITE_STRIPE_PARTY_PRICE_ID
+});
+
 // Pre-defined payment plans matching implementation plan
 export const PRICING_TIERS: PricingTier[] = [
   {
@@ -51,7 +59,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'Launch price - Perfect for trying out our AI portraits',
     credits: 10,
     price: 499, // $4.99
-    priceId: 'price_1S7S5jBMCTqpTWpd2zgC1IPm',
+    priceId: import.meta.env.VITE_STRIPE_STARTER_PRICE_ID || 'price_1S80xuBBS2fcAqSN3PCh3SND',
     features: [
       '10 AI portrait credits',
       'All 12 wedding themes available',
@@ -65,7 +73,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'Most popular choice for couples',
     credits: 25,
     price: 999, // $9.99
-    priceId: 'price_1S7S6gBMCTqpTWpdAPUdabYB',
+    priceId: import.meta.env.VITE_STRIPE_WEDDING_PRICE_ID || 'price_1S80xzBBS2fcAqSNRfHmQ0Fl',
     popular: true,
     features: [
       '25 AI portrait credits',
@@ -82,7 +90,7 @@ export const PRICING_TIERS: PricingTier[] = [
     description: 'Best value for large celebrations',
     credits: 75,
     price: 2499, // $24.99
-    priceId: 'price_1S7S87BMCTqpTWpdtNWuNtjy',
+    priceId: import.meta.env.VITE_STRIPE_PARTY_PRICE_ID || 'price_1S80y3BBS2fcAqSNLzTop2ir',
     bestValue: true,
     features: [
       '75 AI portrait credits',
