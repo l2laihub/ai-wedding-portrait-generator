@@ -5,8 +5,9 @@ import UserManagement from '../../pages/admin/UserManagement';
 import Alerts from '../../pages/admin/Alerts';
 import CreditsManagement from '../../pages/admin/CreditsManagement';
 import PromptManagement from '../../pages/admin/PromptManagement';
+import ThemeManagement from '../../pages/admin/ThemeManagement';
 
-type AdminRoute = 'dashboard' | 'users' | 'alerts' | 'generations' | 'credits' | 'prompts' | 'activity' | 'settings';
+type AdminRoute = 'dashboard' | 'users' | 'alerts' | 'generations' | 'credits' | 'prompts' | 'themes' | 'activity' | 'settings';
 
 const AdminDashboard: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AdminRoute>('dashboard');
@@ -30,6 +31,8 @@ const AdminDashboard: React.FC = () => {
         return <CreditsManagement />; // Note: This manages photo shoots (credits)
       case 'prompts':
         return <PromptManagement />;
+      case 'themes':
+        return <ThemeManagement />;
       case 'activity':
         return (
           <div className="p-6">

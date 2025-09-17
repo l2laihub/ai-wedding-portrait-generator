@@ -333,8 +333,20 @@ class PromptService {
     }
 
     let prompt = template.template
-      .replace(/\{style\}/g, style)
-      .replace(/\{customPrompt\}/g, customPrompt);
+      .replace(/\{style\}/g, style);
+
+    // Handle conditional enhance section (new approach)
+    if (template.template.includes('{enhanceSection}')) {
+      const enhanceSection = customPrompt?.trim() 
+        ? `\n\nENHANCE: ${customPrompt}` 
+        : '';
+      console.log(`[PromptService] Using {enhanceSection} approach. Custom prompt: "${customPrompt || '(empty)'}" → enhanceSection: "${enhanceSection}"`);
+      prompt = prompt.replace(/\{enhanceSection\}/g, enhanceSection);
+    } else {
+      // Fallback for old templates using {customPrompt}
+      console.log(`[PromptService] Using legacy {customPrompt} approach. Custom prompt: "${customPrompt || '(empty)'}"`);
+      prompt = prompt.replace(/\{customPrompt\}/g, customPrompt);
+    }
 
     if (type === 'family') {
       prompt = prompt.replace(/\{familyMemberCount\}/g, familyMemberCount.toString());
@@ -362,8 +374,20 @@ class PromptService {
     }
 
     let prompt = template.template
-      .replace(/\{style\}/g, style)
-      .replace(/\{customPrompt\}/g, customPrompt);
+      .replace(/\{style\}/g, style);
+
+    // Handle conditional enhance section (new approach)
+    if (template.template.includes('{enhanceSection}')) {
+      const enhanceSection = customPrompt?.trim() 
+        ? `\n\nENHANCE: ${customPrompt}` 
+        : '';
+      console.log(`[PromptService] Using {enhanceSection} approach. Custom prompt: "${customPrompt || '(empty)'}" → enhanceSection: "${enhanceSection}"`);
+      prompt = prompt.replace(/\{enhanceSection\}/g, enhanceSection);
+    } else {
+      // Fallback for old templates using {customPrompt}
+      console.log(`[PromptService] Using legacy {customPrompt} approach. Custom prompt: "${customPrompt || '(empty)'}"`);
+      prompt = prompt.replace(/\{customPrompt\}/g, customPrompt);
+    }
 
     if (type === 'family') {
       prompt = prompt.replace(/\{familyMemberCount\}/g, familyMemberCount.toString());
@@ -378,7 +402,7 @@ class PromptService {
    * Get available variables for a prompt type
    */
   public getAvailableVariables(type: 'single' | 'couple' | 'family'): string[] {
-    const baseVariables = ['{style}', '{customPrompt}'];
+    const baseVariables = ['{style}', '{enhanceSection}'];
     
     if (type === 'family') {
       baseVariables.push('{familyMemberCount}');

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/Icon';
 import { promptDatabaseService } from '../../../services/promptDatabaseService';
 import { supabase } from '../../../services/supabaseClient';
+import { ThemeManager, WEDDING_THEMES } from '../../config/themes.config.js';
+import { unifiedThemeService } from '../../../services/unifiedThemeService';
+// Enhanced prompt service import temporarily commented for build compatibility
+// import { enhancedPromptService } from '../../../services/enhancedPromptService';
 
 // Icon paths
 const iconPaths = {
@@ -55,6 +59,43 @@ const defaultPrompts: Record<string, PromptTemplate> = {
   }
 };
 
+// Helper component for async prompt display
+const TestPromptDisplay: React.FC<{ generatePrompt: () => Promise<string>; dependencies: any[] }> = ({ generatePrompt, dependencies }) => {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const updatePrompt = async () => {
+      setLoading(true);
+      try {
+        const newPrompt = await generatePrompt();
+        setPrompt(newPrompt);
+      } catch (error) {
+        console.error('Failed to generate prompt:', error);
+        setPrompt('Error generating prompt');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    updatePrompt();
+  }, dependencies);
+
+  if (loading) {
+    return (
+      <div className="bg-gray-900 border border-gray-600 rounded-lg p-3 text-gray-400 text-sm max-h-32 overflow-y-auto">
+        Generating prompt...
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-600 rounded-lg p-3 text-gray-300 text-sm max-h-32 overflow-y-auto">
+      {prompt}
+    </div>
+  );
+};
+
 const PromptManagement: React.FC = () => {
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null);
@@ -68,21 +109,60 @@ const PromptManagement: React.FC = () => {
   const [testCustomPrompt, setTestCustomPrompt] = useState('');
   const [testFamilyCount, setTestFamilyCount] = useState(3);
 
-  const weddingStyles = [
-    "Classic & Timeless Wedding",
-    "Rustic Barn Wedding", 
-    "Bohemian Beach Wedding",
-    "Vintage Victorian Wedding",
-    "Modern Minimalist Wedding",
-    "Fairytale Castle Wedding",
-    "Enchanted Forest Wedding",
-    "Tropical Paradise Wedding"
-  ];
+  const [weddingStyles, setWeddingStyles] = useState<string[]>([]);
+  const [selectedTheme, setSelectedTheme] = useState(null);
+  const [enhancedMode, setEnhancedMode] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
 
   useEffect(() => {
     loadPrompts();
     checkAdminStatus();
+    initializeThemeSystem();
   }, []);
+
+
+  const initializeThemeSystem = async () => {
+    try {
+      // Get saved enhanced mode preference
+      const isEnhanced = unifiedThemeService.getEnhancedMode();
+      setEnhancedMode(isEnhanced);
+      
+      // Load themes and system status
+      const themes = await unifiedThemeService.getThemeNames();
+      const status = await unifiedThemeService.getSystemStatus();
+      
+      setWeddingStyles(themes);
+      setSystemStatus(status);
+    } catch (error) {
+      console.error('Failed to initialize theme system:', error);
+      // Fallback to legacy themes
+      setWeddingStyles(Object.values(WEDDING_THEMES).map(theme => theme.name));
+    }
+  };
+
+  const handleEnhancedModeToggle = async (enabled: boolean) => {
+    setEnhancedMode(enabled);
+    unifiedThemeService.setEnhancedMode(enabled);
+    
+    // Reload themes with new mode
+    try {
+      const themes = await unifiedThemeService.getThemeNames();
+      const status = await unifiedThemeService.getSystemStatus();
+      
+      setWeddingStyles(themes);
+      setSystemStatus(status);
+      
+      // Reload filtered themes for the browser
+      await loadFilteredThemes();
+      
+      setSuccess(enabled ? 
+        'Enhanced mode enabled - Using database themes' : 
+        'Enhanced mode disabled - Using legacy themes'
+      );
+    } catch (error) {
+      setError('Failed to switch theme mode');
+    }
+  };
 
   const checkAdminStatus = async () => {
     try {
@@ -304,8 +384,25 @@ const PromptManagement: React.FC = () => {
     }
   };
 
-  const generateTestPrompt = () => {
+  const generateTestPrompt = async () => {
     if (!selectedPrompt) return '';
+
+    if (enhancedMode && selectedTheme) {
+      try {
+        // Enhanced prompt service temporarily disabled for build compatibility
+        // const enhanced = await enhancedPromptService.generatePromptWithTheme(
+        //   selectedPrompt.type,
+        //   selectedTheme,
+        //   testCustomPrompt,
+        //   selectedPrompt.type === 'family' ? testFamilyCount : undefined
+        // );
+        // return enhanced;
+        console.warn('Enhanced prompt generation temporarily disabled');
+        return 'Enhanced mode temporarily unavailable';
+      } catch (error) {
+        console.error('Enhanced prompt generation failed:', error);
+      }
+    }
 
     let testPrompt = selectedPrompt.template
       .replace('{style}', testStyle)
@@ -317,6 +414,7 @@ const PromptManagement: React.FC = () => {
 
     return testPrompt;
   };
+
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -455,6 +553,45 @@ const PromptManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Enhanced Features Toggle */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Template Engine Features</h3>
+            <p className="text-sm text-gray-400">Use advanced theme management and enhanced variables</p>
+            <p className="text-xs text-blue-400 mt-1">
+              💡 <strong>New:</strong> Visit the <span className="underline cursor-pointer" onClick={() => window.location.hash = '#themes'}>Themes</span> section to manage wedding styles and template configurations
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => handleEnhancedModeToggle(!enhancedMode)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                enhancedMode
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              {enhancedMode ? 'Enhanced Mode ON' : 'Basic Mode'}
+            </button>
+            
+            {systemStatus && (
+              <div className="text-sm text-gray-400">
+                <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                  systemStatus.databaseAvailable ? 'bg-green-500' : 'bg-yellow-500'
+                }`}></span>
+                {systemStatus.totalThemes} themes • {systemStatus.activeSource}
+                {systemStatus.databaseAvailable && systemStatus.databaseThemes > 0 && (
+                  <span className="ml-2 text-purple-400">
+                    ({systemStatus.databaseThemes} enhanced)
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Prompt List */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
@@ -548,16 +685,24 @@ const PromptManagement: React.FC = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Style</label>
-                      <select
-                        value={testStyle}
-                        onChange={(e) => setTestStyle(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                      >
-                        {weddingStyles.map(style => (
-                          <option key={style} value={style}>{style}</option>
-                        ))}
-                      </select>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        {enhancedMode ? 'Theme (Enhanced)' : 'Style'}
+                      </label>
+                      {enhancedMode ? (
+                        <div className="text-sm text-white bg-gray-700 px-3 py-2 rounded-lg border border-gray-600">
+                          {selectedTheme ? selectedTheme.name : 'Select a theme from the browser below'}
+                        </div>
+                      ) : (
+                        <select
+                          value={testStyle}
+                          onChange={(e) => setTestStyle(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        >
+                          {weddingStyles.map(style => (
+                            <option key={style} value={style}>{style}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     
                     <div>
@@ -590,16 +735,20 @@ const PromptManagement: React.FC = () => {
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-sm font-medium text-gray-300">Generated Prompt</label>
                       <button
-                        onClick={() => copyToClipboard(generateTestPrompt())}
+                        onClick={async () => {
+                          const prompt = await generateTestPrompt();
+                          copyToClipboard(prompt);
+                        }}
                         className="text-blue-400 hover:text-blue-300 text-sm"
                       >
                         <Icon path={iconPaths.copy} className="w-4 h-4 mr-1 inline" />
                         Copy
                       </button>
                     </div>
-                    <div className="bg-gray-900 border border-gray-600 rounded-lg p-3 text-gray-300 text-sm max-h-32 overflow-y-auto">
-                      {generateTestPrompt()}
-                    </div>
+                    <TestPromptDisplay 
+                      generatePrompt={generateTestPrompt}
+                      dependencies={[selectedPrompt, testStyle, testCustomPrompt, testFamilyCount, enhancedMode, selectedTheme]}
+                    />
                   </div>
                 </div>
               )}
@@ -628,8 +777,10 @@ const PromptManagement: React.FC = () => {
                       placeholder="Enter prompt template..."
                     />
                     <div className="text-xs text-gray-400 mt-1">
-                      Available variables: {'{style}'}, {'{customPrompt}'}
+                      Available variables: {'{style}'}, {'{enhanceSection}'}
                       {selectedPrompt.type === 'family' && ', {familyMemberCount}'}
+                      <br />
+                      <span className="text-yellow-400">Note:</span> Use {'{enhanceSection}'} instead of ENHANCE: {'{customPrompt}'} for cleaner output when custom prompt is empty
                     </div>
                   </div>
 
@@ -674,8 +825,11 @@ const PromptManagement: React.FC = () => {
                   <div className="text-xs text-gray-400">
                     <p>Version {selectedPrompt.version} • Last modified: {selectedPrompt.lastModified instanceof Date ? selectedPrompt.lastModified.toLocaleString() : 'Unknown'}</p>
                     <p className="mt-1">
-                      Variables: {'{style}'}, {'{customPrompt}'}
+                      Variables: {'{style}'}, {'{enhanceSection}'}
                       {selectedPrompt.type === 'family' && ', {familyMemberCount}'}
+                    </p>
+                    <p className="mt-1 text-yellow-400">
+                      💡 Tip: Use {'{enhanceSection}'} for conditional enhancement (no empty ENHANCE section)
                     </p>
                   </div>
                 </div>
@@ -690,6 +844,7 @@ const PromptManagement: React.FC = () => {
           )}
         </div>
       </div>
+
     </div>
   );
 };

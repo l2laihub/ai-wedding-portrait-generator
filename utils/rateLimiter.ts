@@ -70,17 +70,21 @@ class RateLimiter {
   }
 
   /**
-   * Get the next reset time (midnight PT)
+   * Get the next reset time (midnight local time)
    */
   private getNextResetTime(): Date {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(this.config.RESET_HOUR, 0, 0, 0);
+    const resetTime = new Date(now);
     
-    // Adjust for Pacific Time
-    const pacificOffset = -8 * 60; // PST is UTC-8
-    return new Date(tomorrow.getTime() + (pacificOffset * 60 * 1000));
+    // Set to midnight tonight
+    resetTime.setHours(24, 0, 0, 0);
+    
+    // If it's already past midnight (shouldn't happen with proper reset), add a day
+    if (resetTime.getTime() <= now.getTime()) {
+      resetTime.setDate(resetTime.getDate() + 1);
+    }
+    
+    return resetTime;
   }
 
   /**

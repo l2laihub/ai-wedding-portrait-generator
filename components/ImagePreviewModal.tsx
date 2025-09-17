@@ -22,8 +22,6 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   style 
 }) => {
   useEffect(() => {
-    console.log('ImagePreviewModal render', { isOpen, imageUrl, title });
-    
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();

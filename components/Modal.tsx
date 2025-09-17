@@ -4,7 +4,8 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  title?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'small' | 'medium' | 'large' | 'full';
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
   preventScroll?: boolean;
@@ -15,6 +16,7 @@ const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   children,
+  title,
   size = 'md',
   closeOnBackdrop = true,
   closeOnEscape = true,
@@ -60,11 +62,21 @@ const Modal: React.FC<ModalProps> = ({
 
   const getSizeClasses = () => {
     switch (size) {
-      case 'sm': return 'max-w-sm';
-      case 'md': return 'max-w-md';
-      case 'lg': return 'max-w-lg';
-      case 'xl': return 'max-w-xl';
-      default: return 'max-w-md';
+      case 'sm':
+      case 'small': 
+        return 'max-w-sm';
+      case 'md':
+      case 'medium': 
+        return 'max-w-2xl';
+      case 'lg':
+      case 'large': 
+        return 'max-w-4xl';
+      case 'xl': 
+        return 'max-w-6xl';
+      case 'full':
+        return 'max-w-[95vw]';
+      default: 
+        return 'max-w-md';
     }
   };
 
@@ -77,7 +89,17 @@ const Modal: React.FC<ModalProps> = ({
         className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 ${getSizeClasses()} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {children}
+        {title && (
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h2>
+            <ModalCloseButton onClose={onClose} />
+          </div>
+        )}
+        <div className={title ? '' : ''}>
+          {children}
+        </div>
       </div>
     </div>
   );

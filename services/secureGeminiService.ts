@@ -338,6 +338,18 @@ class SecureGeminiService {
     const generateStylePortrait = async (style: string) => {
       const prompt = await generatePrompt(style)
       
+      // Debug logging for final prompt
+      console.log(`\n🎯 [FINAL PROMPT DEBUG] Style: ${style}`);
+      console.log(`📝 Photo Type: ${photoType}`);
+      console.log(`💬 Custom Prompt: "${customPrompt || '(empty)'}"`);
+      if (photoType === 'family') {
+        console.log(`👨‍👩‍👧‍👦 Family Members: ${familyMemberCount}`);
+      }
+      console.log(`📄 Full Prompt (${prompt.length} chars):`);
+      console.log('=====================================');
+      console.log(prompt);
+      console.log('=====================================\n');
+      
       try {
         // Notify that generation is starting
         onProgressUpdate?.(style, 'in_progress')

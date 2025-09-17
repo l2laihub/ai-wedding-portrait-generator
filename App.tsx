@@ -31,13 +31,22 @@ import {
   SuspensePhotoTypeSelector,
   preloadCriticalComponents
 } from './components/LazyComponents';
+// Enhanced components
+import EnhancedPromptInput from './components/EnhancedPromptInput';
+import EnhancedImageDisplay from './components/EnhancedImageDisplay';
+import EnhancedComponentErrorBoundary from './components/EnhancedComponentErrorBoundary';
 import { editImageWithNanoBanana } from './services/geminiService';
 import { secureGeminiService, userIdentificationService } from './services';
+// Enhanced services - with fallback handling
+// import { enhancedSecureGeminiService } from './services/enhancedSecureGeminiService';
 import { GeneratedContent } from './types';
 import { useViewport } from './hooks/useViewport';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { posthogService } from './services/posthogService';
 import { counterService } from './services/counterService';
+// Enhanced template engine support
+import { migrationUtils, TemplateEngineMigration } from './utils/templateEngineMigration';
+import { themeManager } from './services/templateEngine/ThemeManager';
 // import { useAppFeatureFlags, FEATURE_FLAGS } from './hooks/useFeatureFlags';
 
 // Import admin utilities for debugging (development only)
@@ -142,6 +151,13 @@ function App({ navigate }: AppProps) {
     startTime?: number;
   }>>([]);
   
+  // Enhanced features state
+  const [useEnhancedComponents, setUseEnhancedComponents] = useState<boolean>(true);
+  const [selectedThemes, setSelectedThemes] = useState<any[]>([]);
+  const [enhancedSystemReady, setEnhancedSystemReady] = useState<boolean>(false);
+  const [migrationStatus, setMigrationStatus] = useState<any>(null);
+  const [enhancedSecureGeminiService, setEnhancedSecureGeminiService] = useState<any>(null);
+  
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
@@ -163,6 +179,279 @@ function App({ navigate }: AppProps) {
     setCustomPrompt(newPrompt);
     if (newPrompt.length > 0) {
       posthogService.trackPromptModified(newPrompt);
+    }
+  };
+
+  // Enhanced generation handler with theme support
+  const handleEnhancedGenerate = async (selectedThemeIds?: string[]) => {
+    if (!sourceImageFile) {
+      setError("Please upload an image first.");
+      return;
+    }
+
+    if (!isOnline) {
+      setError("Please check your internet connection and try again.");
+      return;
+    }
+
+    // Initialize user identification service
+    await userIdentificationService.initialize();
+    
+    // Rate limit checks (same as original)
+    if (user) {
+      const balance = await creditsService.getBalance();
+      if (!balance.canUseCredits) {
+        setShowLimitModal(true);
+        return;
+      }
+    } else {
+      const localLimit = rateLimiter.checkLimit();
+      if (!localLimit.canProceed) {
+        setShowLimitModal(true);
+        setError(`You've used all 3 free photo shoots today (${localLimit.total - localLimit.remaining}/3). Each photo shoot creates 3 images!`);
+        return;
+      }
+      
+      const backendLimit = await secureGeminiService.checkRateLimit();
+      if (!backendLimit.canProceed) {
+        setShowLimitModal(true);
+        setError(`Rate limit reached. Please try again later.`);
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setGeneratedContents(null);
+    
+    // Get themes using enhanced system or fallback to legacy
+    let themesToGenerate;
+    
+    try {
+      if (selectedThemeIds && selectedThemeIds.length > 0 && enhancedSystemReady) {
+        // Use selected themes from enhanced system
+        themesToGenerate = selectedThemeIds.map(id => {
+          const theme = themeManager.getStyle(id);
+          return theme || { id, name: id, style: id }; // fallback
+        });
+        console.log('🎯 Using selected enhanced themes:', themesToGenerate.map(t => t.name));
+      } else if (enhancedSystemReady) {
+        // Use enhanced random theme selection
+        const enhancedThemes = themeManager.getRandomStyles(3, { favorFeatured: true });
+        themesToGenerate = enhancedThemes;
+        console.log('🎨 Using enhanced random themes:', themesToGenerate.map(t => t.name));
+      } else {
+        // Fallback to legacy system
+        const legacyStyles = getRandomWeddingStyles();
+        themesToGenerate = migrationUtils.stylesToThemes(legacyStyles);
+        console.log('🔄 Using legacy themes with migration:', themesToGenerate.map(t => t.name));
+      }
+    } catch (error) {
+      console.warn('Theme generation failed, using emergency fallback:', error);
+      const legacyStyles = getRandomWeddingStyles();
+      themesToGenerate = legacyStyles.map(style => ({ id: style, name: style, style }));
+    }
+    
+    // Store for consistent use across components
+    setCurrentStyles(themesToGenerate.map(t => t.name || t.style || t.id)); 
+    setSelectedThemes(themesToGenerate);
+    
+    // Initialize progress tracking
+    const initialProgress = themesToGenerate.map(theme => ({
+      style: theme.name || theme.style || theme.id,
+      status: 'waiting' as const,
+      theme: theme
+    }));
+    setGenerationProgress(initialProgress);
+
+    // Generate unique ID for this generation session
+    const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setCurrentGenerationId(generationId);
+
+    try {
+      // Track generation started
+      posthogService.trackGenerationStarted(generationId, {
+        styles: themesToGenerate.map(t => t.name || t.style || t.id),
+        themes: themesToGenerate.map(t => t.id),
+        customPrompt: customPrompt || undefined,
+        generationId,
+        timestamp: Date.now(),
+        enhancedMode: enhancedSystemReady
+      });
+      
+      // Track each theme in database analytics
+      themesToGenerate.forEach(async (theme) => {
+        await databaseService.trackUsage(generationId, photoType, theme.name || theme.style || theme.id);
+      });
+      
+      let generationResult;
+      
+      if (enhancedSystemReady && enhancedSecureGeminiService) {
+        console.log(`🎨 Generating ${themesToGenerate.length} styles using enhanced system`);
+        
+        try {
+          // Use enhanced generation service
+          generationResult = await enhancedSecureGeminiService.generateMultipleEnhancedPortraits(
+            sourceImageFile,
+            {
+              themes: themesToGenerate,
+              customPrompt,
+              portraitType: photoType,
+              familyMemberCount,
+              count: themesToGenerate.length
+            },
+            (identifier, status, theme) => {
+              // Update progress in real-time
+              setGenerationProgress(prev => prev.map(p => 
+                (p.style === identifier || p.theme?.id === identifier || p.theme?.name === identifier)
+                  ? { ...p, status, startTime: status === 'in_progress' ? Date.now() : p.startTime }
+                  : p
+              ));
+            }
+          );
+          
+          console.log('✨ Enhanced generation completed');
+        } catch (enhancedError) {
+          console.warn('Enhanced generation failed, falling back to legacy:', enhancedError);
+          // Fallback to legacy system
+          generationResult = await secureGeminiService.generateMultiplePortraits(
+            sourceImageFile,
+            themesToGenerate.map(t => t.name || t.style || t.id),
+            customPrompt,
+            photoType,
+            familyMemberCount,
+            (style, status) => {
+              setGenerationProgress(prev => prev.map(p => 
+                p.style === style 
+                  ? { ...p, status, startTime: status === 'in_progress' ? Date.now() : p.startTime }
+                  : p
+              ));
+            }
+          );
+        }
+      } else {
+        console.log(`🔄 Using legacy generation system`);
+        
+        // Use legacy system
+        generationResult = await secureGeminiService.generateMultiplePortraits(
+          sourceImageFile,
+          themesToGenerate.map(t => t.name || t.style || t.id),
+          customPrompt,
+          photoType,
+          familyMemberCount,
+          (style, status) => {
+            setGenerationProgress(prev => prev.map(p => 
+              p.style === style 
+                ? { ...p, status, startTime: status === 'in_progress' ? Date.now() : p.startTime }
+                : p
+            ));
+          }
+        );
+      }
+      
+      // Process results (same as original logic)
+      const finalContents: GeneratedContent[] = [];
+      
+      for (const result of generationResult.results) {
+        if (result.success && result.data) {
+          // Update progress: mark as completed
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === result.style 
+              ? { ...p, status: 'completed' }
+              : p
+          ));
+          
+          // Track successful style generation
+          posthogService.trackStyleGenerated({
+            style: result.style,
+            generationId,
+            duration: result.processing_time_ms || 0,
+            success: true,
+          });
+          
+          finalContents.push(result.data);
+        } else {
+          // Update progress: mark as failed
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === result.style 
+              ? { ...p, status: 'failed' }
+              : p
+          ));
+          
+          // Track failed style generation
+          posthogService.trackStyleGenerated({
+            style: result.style,
+            generationId,
+            duration: result.processing_time_ms || 0,
+            success: false,
+            error: result.error || 'Unknown error',
+          });
+          
+          finalContents.push({
+            imageUrl: null,
+            text: result.error || 'Generation failed',
+            style: result.style,
+          });
+        }
+      }
+      
+      // Handle remaining logic (credit consumption, etc.)
+      if (user && generationResult.successful > 0) {
+        const consumeResult = await creditsService.consumeCredit(`Portrait generation - ${photoType}`);
+        if (!consumeResult.success) {
+          console.warn('Failed to consume credit after generation:', consumeResult.error);
+        }
+      } else if (!user && generationResult.successful > 0) {
+        const limitResult = rateLimiter.consumeCredit();
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: limitResult.remaining }
+        }));
+      }
+      
+      setGeneratedContents(finalContents);
+      
+      // Track generation completed
+      const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
+      const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
+      posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
+      
+      // Increment counter
+      incrementCounterWithMetadata(
+        generationId,
+        successfulStyles.length,
+        themesToGenerate.length,
+        photoType,
+        themesToGenerate.map(t => t.name || t.style || t.id),
+        customPrompt
+      );
+      
+      // Handle error messages based on results
+      if (failedStyles.length > 0) {
+        const hasRateLimitError = finalContents.some(c => 
+          c.imageUrl === null && 
+          (c.text?.includes('quota') || c.text?.includes('limit') || c.text?.includes('Rate limit') || c.text?.includes('popular today'))
+        );
+        
+        const hasServerError = finalContents.some(c => 
+          c.imageUrl === null && 
+          (c.text?.includes('Server temporarily unavailable') || c.text?.includes('internal error'))
+        );
+        
+        if (hasRateLimitError) {
+          setError(`Some portrait styles hit rate limits, but ${successfulStyles.length} succeeded! 🎆`);
+        } else if (hasServerError) {
+          setError(`${successfulStyles.length} portraits generated successfully! ${failedStyles.length} styles experienced server issues but you can try regenerating them. 🔄`);
+        } else {
+          setError(`${successfulStyles.length} portraits are ready! ${failedStyles.length} styles encountered issues - try adjusting your prompt or photo. ✨`);
+        }
+      }
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred during the generation process.";
+      posthogService.trackGenerationFailed(generationId, errorMessage);
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -527,6 +816,49 @@ function App({ navigate }: AppProps) {
     }
   }, [showUpgradePrompt]);
 
+  // Initialize enhanced system and check compatibility
+  useEffect(() => {
+    const initializeEnhancedSystem = async () => {
+      try {
+        // Check if enhanced system is available
+        const status = migrationUtils.getMigrationStatus();
+        setMigrationStatus(status);
+        setEnhancedSystemReady(status.migrationReady);
+        
+        console.log('🚀 Enhanced system status:', {
+          ready: status.migrationReady,
+          themes: status.themesValidated,
+          errors: status.errors.length
+        });
+        
+        // Try to dynamically load enhanced service if system is ready
+        if (status.migrationReady) {
+          try {
+            // Note: Enhanced Gemini service temporarily disabled due to import issues
+            // const enhancedModule = await import('./services/enhancedSecureGeminiService');
+            // setEnhancedSecureGeminiService(enhancedModule.enhancedSecureGeminiService);
+            console.log('⚠️ Enhanced Gemini service temporarily disabled due to import compatibility');
+            setEnhancedSecureGeminiService(null);
+          } catch (importError) {
+            console.warn('⚠️ Failed to load enhanced Gemini service:', importError);
+            setEnhancedSecureGeminiService(null);
+          }
+        }
+        
+        // Only use enhanced components if system is ready
+        setUseEnhancedComponents(status.migrationReady && status.themesValidated > 0);
+        
+      } catch (error) {
+        console.warn('Failed to initialize enhanced system:', error);
+        setEnhancedSystemReady(false);
+        setUseEnhancedComponents(false);
+        setEnhancedSecureGeminiService(null);
+      }
+    };
+
+    initializeEnhancedSystem();
+  }, []);
+
   // Preload critical components on app mount and identify user
   useEffect(() => {
     preloadCriticalComponents();
@@ -659,12 +991,41 @@ function App({ navigate }: AppProps) {
           />
 
           {sourceImageUrl && (
-            <SuspensePromptInput 
-              onSubmit={handleGenerate} 
-              isLoading={isLoading}
-              customPrompt={customPrompt}
-              onCustomPromptChange={handleCustomPromptChange}
-            />
+            <div>
+              
+              {/* Use Enhanced or Legacy Prompt Input */}
+              {useEnhancedComponents && enhancedSystemReady ? (
+                <EnhancedComponentErrorBoundary
+                  componentName="EnhancedPromptInput"
+                  fallback={
+                    <SuspensePromptInput 
+                      onSubmit={handleGenerate} 
+                      isLoading={isLoading}
+                      customPrompt={customPrompt}
+                      onCustomPromptChange={handleCustomPromptChange}
+                    />
+                  }
+                  onError={(error) => {
+                    console.warn('Enhanced prompt input failed, falling back to legacy:', error);
+                    setUseEnhancedComponents(false);
+                  }}
+                >
+                  <EnhancedPromptInput
+                    onSubmit={handleEnhancedGenerate}
+                    isLoading={isLoading}
+                    customPrompt={customPrompt}
+                    onCustomPromptChange={handleCustomPromptChange}
+                  />
+                </EnhancedComponentErrorBoundary>
+              ) : (
+                <SuspensePromptInput 
+                  onSubmit={handleGenerate} 
+                  isLoading={isLoading}
+                  customPrompt={customPrompt}
+                  onCustomPromptChange={handleCustomPromptChange}
+                />
+              )}
+            </div>
           )}
 
           {isLoading && (
@@ -729,12 +1090,41 @@ function App({ navigate }: AppProps) {
           )}
 
           {generatedContents && (
-            <SuspenseImageDisplay 
-              contents={generatedContents} 
-              generationId={currentGenerationId}
-              photoType={photoType}
-              familyMemberCount={familyMemberCount}
-            />
+            <div>
+              {/* Use Enhanced or Legacy Image Display */}
+              {useEnhancedComponents && enhancedSystemReady ? (
+                <EnhancedComponentErrorBoundary
+                  componentName="EnhancedImageDisplay"
+                  fallback={
+                    <SuspenseImageDisplay 
+                      contents={generatedContents} 
+                      generationId={currentGenerationId}
+                      photoType={photoType}
+                      familyMemberCount={familyMemberCount}
+                    />
+                  }
+                  onError={(error) => {
+                    console.warn('Enhanced image display failed, falling back to legacy:', error);
+                    // Don't disable enhanced components globally for display issues
+                  }}
+                >
+                  <EnhancedImageDisplay
+                    contents={generatedContents}
+                    generationId={currentGenerationId}
+                    photoType={photoType}
+                    familyMemberCount={familyMemberCount}
+                    generationProgress={generationProgress}
+                  />
+                </EnhancedComponentErrorBoundary>
+              ) : (
+                <SuspenseImageDisplay 
+                  contents={generatedContents} 
+                  generationId={currentGenerationId}
+                  photoType={photoType}
+                  familyMemberCount={familyMemberCount}
+                />
+              )}
+            </div>
           )}
 
           {/* Upgrade Prompt or How it works - only show when no image uploaded */}
