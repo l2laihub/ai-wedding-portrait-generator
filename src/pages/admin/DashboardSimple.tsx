@@ -103,7 +103,7 @@ const DashboardSimple: React.FC = () => {
           loading={metrics.loading}
         />
         <MetricCard
-          title="Total Generations"
+          title="Total Photo Shoots"
           value={metrics.totalGenerations.toLocaleString()}
           change={{ value: 23.1, isPositive: true }}
           iconPath={iconPaths.image}
@@ -145,7 +145,7 @@ const DashboardSimple: React.FC = () => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm font-medium">Avg Generations Per User</p>
+              <p className="text-gray-400 text-sm font-medium">Avg Photo Shoots Per User</p>
               <p className="text-2xl font-semibold text-white mt-2">
                 {(metrics.totalGenerations / (metrics.totalUsers || 1)).toFixed(1)}
               </p>
@@ -167,7 +167,7 @@ const DashboardSimple: React.FC = () => {
                   <div className="grid grid-cols-4 gap-4 text-gray-400 font-medium">
                     <span>Date</span>
                     <span>Users</span>
-                    <span>Generations</span>
+                    <span>Photo Shoots</span>
                     <span>Revenue</span>
                   </div>
                   <div className="max-h-64 overflow-y-auto space-y-1">
@@ -182,7 +182,7 @@ const DashboardSimple: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-4 text-xs text-gray-400">
-                  Showing last 10 days • Total: {chartData.daily.reduce((sum, d) => sum + d.users, 0)} users, {chartData.daily.reduce((sum, d) => sum + d.generations, 0)} generations
+                  Showing last 10 days • Total: {chartData.daily.reduce((sum, d) => sum + d.users, 0)} users, {chartData.daily.reduce((sum, d) => sum + d.generations, 0)} photo shoots
                 </div>
               </div>
             ) : (
@@ -224,7 +224,7 @@ const DashboardSimple: React.FC = () => {
                 })}
                 <div className="mt-4 pt-4 border-t border-gray-700">
                   <div className="text-xs text-gray-400">
-                    Total generations: {chartData.styleDistribution.reduce((sum, s) => sum + s.value, 0)}
+                    Total photo shoots: {chartData.styleDistribution.reduce((sum, s) => sum + s.value, 0)}
                   </div>
                 </div>
               </div>

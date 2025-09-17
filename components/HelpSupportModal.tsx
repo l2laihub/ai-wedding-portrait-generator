@@ -43,17 +43,17 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({
         'Upload a clear photo of yourself or couple',
         'Choose photo type (single, couple, or family)',
         'Optionally customize your prompt',
-        'Click Generate to create 3 unique wedding portraits',
+        'Click Start Photo Shoot to create 3 unique wedding portraits',
         'Download and share your beautiful results!'
       ]
     },
     {
-      title: '💳 Credits & Pricing',
+      title: '💳 Photo Shoots & Pricing',
       items: [
-        'Get 5 free daily credits to start',
-        'Each generation uses 1 credit',
-        'Purchase credit packages for unlimited portraits',
-        'Credits never expire once purchased',
+        'Get 3 free daily photo shoots to start (9 images)',
+        'Each photo shoot creates 3 unique themed portraits',
+        'Purchase photo packs for unlimited portrait creation',
+        'Photo shoots never expire once purchased',
         'Check your balance in your Profile'
       ]
     },
@@ -72,7 +72,7 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({
       items: [
         'If generation fails, try a different photo',
         'Check your internet connection',
-        'Make sure you have available credits',
+        'Make sure you have available photo shoots',
         'Clear browser cache if experiencing issues',
         'Contact support if problems persist'
       ]

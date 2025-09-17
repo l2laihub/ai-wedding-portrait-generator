@@ -35,42 +35,42 @@ const PricingModal: React.FC<PricingModalProps> = ({
   const pricingTiers: PricingTier[] = [
     {
       id: 'starter',
-      name: 'Starter',
-      description: 'Perfect for trying out the service',
+      name: 'Starter Pack',
+      description: '10 photo shoots (30 images)',
       credits: 10,
       price: 499,
       priceId: 'price_1S7S5jBMCTqpTWpd2zgC1IPm',
       popular: false,
       bestValue: false,
-      features: ['10 AI portrait credits', 'All 12 wedding themes available']
+      features: ['10 photo shoots', '30 portrait images', 'Just $0.17 per image!', 'All 12 wedding themes']
     },
     {
       id: 'wedding',
-      name: 'Wedding',
-      description: 'Most popular choice for couples',
+      name: 'Wedding Pack',
+      description: '25 photo shoots (75 images)',
       credits: 25,
       price: 999,
       priceId: 'price_1S7S6gBMCTqpTWpdAPUdabYB',
       popular: true,
       bestValue: false,
-      features: ['25 AI portrait credits', 'All 12 premium wedding themes']
+      features: ['25 photo shoots', '75 portrait images', 'Just $0.13 per image!', 'All premium themes', 'MOST POPULAR']
     },
     {
       id: 'party',
-      name: 'Party',
-      description: 'Best value for large celebrations',
+      name: 'Party Pack',
+      description: '75 photo shoots (225 images!)',
       credits: 75,
       price: 2499,
       priceId: 'price_1S7S87BMCTqpTWpdtNWuNtjy',
       popular: false,
       bestValue: true,
-      features: ['75 AI portrait credits', 'All exclusive themes']
+      features: ['75 photo shoots', '225 portrait images!', 'Just $0.11 per image!', 'All exclusive themes', 'BEST VALUE']
     }
   ];
 
   const handlePurchaseClick = async (tier: PricingTier) => {
     if (!isAuthenticated || !user) {
-      alert('Please sign in to purchase credits');
+      alert('Please sign in to purchase photo packs');
       return;
     }
 
@@ -114,10 +114,10 @@ const PricingModal: React.FC<PricingModalProps> = ({
           <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Choose Your Wedding Pack
+                Choose Your Photo Pack
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Select the perfect credit package for your needs
+                Every photo shoot creates 3 themed portraits!
               </p>
             </div>
             <button

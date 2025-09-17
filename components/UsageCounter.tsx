@@ -33,6 +33,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
     } else {
       // For anonymous users, use rate limiter
       const info = rateLimiter.checkLimit();
+      console.log('UsageCounter: Rate limiter info updated:', info);
       setLimitInfo(info);
       setCreditBalance(null);
       
@@ -77,7 +78,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
 
   // Determine display values based on user type
   const isAuthenticated = !!user;
-  const displayLimit = 5; // Show 5 to users even though internal limit is 5
+  const displayLimit = 3; // Show 3 daily portraits for anonymous users
   
   const remaining = isAuthenticated ? creditBalance?.totalAvailable || 0 : Math.min(limitInfo?.remaining || 0, displayLimit);
   const total = isAuthenticated ? creditBalance?.totalAvailable || 0 : displayLimit;
@@ -112,13 +113,13 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           {isAuthenticated ? (
             creditBalance?.totalAvailable ? (
               creditBalance.freeCreditsRemaining > 0 ? 
-                `${Math.min(creditBalance.freeCreditsRemaining, displayLimit)}/5 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} credits` :
-                `${creditBalance.totalAvailable} credits available`
+                `${Math.min(creditBalance.freeCreditsRemaining, 3)}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} photo shoots` :
+                `${creditBalance.totalAvailable} photo shoots available`
             ) : (
-              '0 credits remaining'
+              '0 photo shoots remaining'
             )
           ) : (
-            `${remaining}/${displayLimit} free portraits today`
+            `${remaining}/${displayLimit} photo shoots today (${remaining * 3} images)`
           )}
         </span>
         {showTimeUntilReset && remaining === 0 && (
@@ -139,12 +140,12 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
             className={`w-5 h-5 ${getStatusColor()}`} 
           />
           <h3 className="font-medium text-gray-900 dark:text-white">
-            {isAuthenticated ? 'Credit Balance' : 'Daily Usage'}
+            {isAuthenticated ? 'Photo Shoots Balance' : 'Daily Photo Shoots'}
           </h3>
         </div>
         <span className={`text-lg font-bold ${getStatusColor()}`}>
           {isAuthenticated ? 
-            `${creditBalance?.totalAvailable || 0} credits` :
+            `${creditBalance?.totalAvailable || 0} photo shoots` :
             `${remaining}/${displayLimit}`
           }
         </span>
@@ -153,7 +154,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
       {/* Progress Bar */}
       <div className="mb-3">
         <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-          <span>Portraits used</span>
+          <span>Photo shoots used</span>
           <span>{progressPercentage}%</span>
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -170,29 +171,29 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           creditBalance?.totalAvailable && creditBalance.totalAvailable > 0 ? (
             <div className="space-y-1">
               {creditBalance.freeCreditsRemaining > 0 && (
-                <div>Free today: <strong className={getStatusColor()}>{Math.min(creditBalance.freeCreditsRemaining, displayLimit)}/3</strong></div>
+                <div>Free today: <strong className={getStatusColor()}>{Math.min(creditBalance.freeCreditsRemaining, 3)}/3</strong> <span className="text-xs text-gray-500">({Math.min(creditBalance.freeCreditsRemaining, 3) * 3} images)</span></div>
               )}
               {creditBalance.paidCredits > 0 && (
-                <div>Purchased: <strong className="text-blue-600 dark:text-blue-400">{creditBalance.paidCredits}</strong></div>
+                <div>Purchased: <strong className="text-blue-600 dark:text-blue-400">{creditBalance.paidCredits}</strong> <span className="text-xs text-gray-500">({creditBalance.paidCredits * 3} images)</span></div>
               )}
               {creditBalance.bonusCredits > 0 && (
-                <div>Bonus: <strong className="text-green-600 dark:text-green-400">{creditBalance.bonusCredits}</strong></div>
+                <div>Bonus: <strong className="text-green-600 dark:text-green-400">{creditBalance.bonusCredits}</strong> <span className="text-xs text-gray-500">({creditBalance.bonusCredits * 3} images)</span></div>
               )}
             </div>
           ) : (
             <span>
-              No credits remaining. Purchase credits to generate more portraits.
+              No photo shoots remaining. Get a photo pack to continue creating amazing portraits!
             </span>
           )
         ) : (
           limitInfo?.remaining && limitInfo.remaining > 0 ? (
             <span>
-              You have <strong className={getStatusColor()}>{limitInfo.remaining}</strong> free portrait
-              {limitInfo.remaining !== 1 ? 's' : ''} remaining today.
+              You have <strong className={getStatusColor()}>{limitInfo.remaining}</strong> free photo shoot{limitInfo.remaining !== 1 ? 's' : ''} remaining today 
+              <strong className="text-blue-600 dark:text-blue-400"> ({limitInfo.remaining * 3} images!)</strong>
             </span>
           ) : (
             <span>
-              You've reached your daily limit. 
+              You've used today's 3 free photo shoots (9 images)! 
               {showTimeUntilReset && (
                 <span className="ml-1">
                   Resets in <strong>{timeUntilReset}</strong>.

@@ -170,8 +170,8 @@ const CreditsManagement: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Credits Management</h1>
-          <p className="text-gray-400 mt-2">Manage user credits, transactions, and billing</p>
+          <h1 className="text-3xl font-bold text-white">Photo Shoots Management</h1>
+          <p className="text-gray-400 mt-2">Manage user photo shoots, transactions, and billing</p>
         </div>
       </div>
 
@@ -209,7 +209,7 @@ const CreditsManagement: React.FC = () => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm font-medium">Total Paid Credits</p>
+              <p className="text-gray-400 text-sm font-medium">Total Paid Photo Shoots</p>
               <p className="text-2xl font-semibold text-white mt-2">{stats.totalPaidCredits.toLocaleString()}</p>
             </div>
             <Icon path={iconPaths.creditCard} className="w-8 h-8 text-green-500" />
@@ -219,7 +219,7 @@ const CreditsManagement: React.FC = () => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm font-medium">Total Bonus Credits</p>
+              <p className="text-gray-400 text-sm font-medium">Total Bonus Photo Shoots</p>
               <p className="text-2xl font-semibold text-white mt-2">{stats.totalBonusCredits.toLocaleString()}</p>
             </div>
             <Icon path={iconPaths.plus} className="w-8 h-8 text-blue-500" />
@@ -229,7 +229,7 @@ const CreditsManagement: React.FC = () => {
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm font-medium">Credits Used Today</p>
+              <p className="text-gray-400 text-sm font-medium">Photo Shoots Used Today</p>
               <p className="text-2xl font-semibold text-white mt-2">{stats.totalUsedCredits.toLocaleString()}</p>
             </div>
             <Icon path={iconPaths.trendingDown} className="w-8 h-8 text-red-500" />
@@ -251,7 +251,7 @@ const CreditsManagement: React.FC = () => {
       <div className="border-b border-gray-700">
         <nav className="flex space-x-8">
           {[
-            { id: 'users', label: 'User Credits', count: users.length },
+            { id: 'users', label: 'User Photo Shoots', count: users.length },
             { id: 'transactions', label: 'Transactions', count: transactions.length },
             { id: 'bulk', label: 'Bulk Operations', count: selectedUsers.length }
           ].map(tab => (
@@ -301,10 +301,10 @@ const CreditsManagement: React.FC = () => {
                       User
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Paid Credits
+                      Paid Photo Shoots
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Bonus Credits
+                      Bonus Photo Shoots
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Used Today
@@ -362,7 +362,7 @@ const CreditsManagement: React.FC = () => {
                                 setShowGrantModal(true);
                               }}
                               className="text-green-400 hover:text-green-300 p-1 rounded"
-                              title="Grant credits"
+                              title="Grant photo shoots"
                             >
                               <Icon path={iconPaths.plus} className="w-4 h-4" />
                             </button>
@@ -372,7 +372,7 @@ const CreditsManagement: React.FC = () => {
                                 setShowDeductModal(true);
                               }}
                               className="text-red-400 hover:text-red-300 p-1 rounded"
-                              title="Deduct credits"
+                              title="Deduct photo shoots"
                             >
                               <Icon path={iconPaths.minus} className="w-4 h-4" />
                             </button>
@@ -467,7 +467,7 @@ const CreditsManagement: React.FC = () => {
                     <p className={`text-sm font-medium ${
                       transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
                     }`}>
-                      {transaction.amount > 0 ? '+' : ''}{transaction.amount} credits
+                      {transaction.amount > 0 ? '+' : ''}{transaction.amount} photo shoots
                     </p>
                     <p className="text-xs text-gray-400">Balance: {transaction.balance_after}</p>
                   </div>
@@ -484,16 +484,16 @@ const CreditsManagement: React.FC = () => {
           <p className="text-gray-400 mb-6">Coming soon: Bulk credit operations, mass refunds, and batch processing.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="p-4 border border-gray-600 rounded-lg">
-              <h4 className="text-white font-medium mb-2">Bulk Grant Credits</h4>
-              <p className="text-gray-400 text-sm">Grant credits to multiple users at once</p>
+              <h4 className="text-white font-medium mb-2">Bulk Grant Photo Shoots</h4>
+              <p className="text-gray-400 text-sm">Grant photo shoots to multiple users at once</p>
             </div>
             <div className="p-4 border border-gray-600 rounded-lg">
               <h4 className="text-white font-medium mb-2">Mass Refunds</h4>
               <p className="text-gray-400 text-sm">Process refunds for multiple transactions</p>
             </div>
             <div className="p-4 border border-gray-600 rounded-lg">
-              <h4 className="text-white font-medium mb-2">Credit Expiry</h4>
-              <p className="text-gray-400 text-sm">Manage credit expiration policies</p>
+              <h4 className="text-white font-medium mb-2">Photo Shoot Expiry</h4>
+              <p className="text-gray-400 text-sm">Manage photo shoot expiration policies</p>
             </div>
           </div>
         </div>
@@ -503,7 +503,7 @@ const CreditsManagement: React.FC = () => {
       {showGrantModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4">Grant Credits</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Grant Photo Shoots</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">User</label>
@@ -516,7 +516,7 @@ const CreditsManagement: React.FC = () => {
                   value={actionAmount}
                   onChange={(e) => setActionAmount(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="Enter credits amount"
+                  placeholder="Enter photo shoots amount"
                   min="1"
                 />
               </div>
@@ -527,7 +527,7 @@ const CreditsManagement: React.FC = () => {
                   value={actionReason}
                   onChange={(e) => setActionReason(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="Enter reason for granting credits"
+                  placeholder="Enter reason for granting photo shoots"
                 />
               </div>
               <div className="flex space-x-3">
@@ -536,7 +536,7 @@ const CreditsManagement: React.FC = () => {
                   disabled={actionLoading || !actionAmount || !actionReason}
                   className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {actionLoading ? 'Processing...' : 'Grant Credits'}
+                  {actionLoading ? 'Processing...' : 'Grant Photo Shoots'}
                 </button>
                 <button
                   onClick={() => {
@@ -559,12 +559,12 @@ const CreditsManagement: React.FC = () => {
       {showDeductModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4">Deduct Credits</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Deduct Photo Shoots</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">User</label>
                 <p className="text-white">{selectedUser.name} ({selectedUser.email})</p>
-                <p className="text-sm text-gray-400">Current balance: {selectedUser.totalCredits} credits</p>
+                <p className="text-sm text-gray-400">Current balance: {selectedUser.totalCredits} photo shoots</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Amount</label>
@@ -573,7 +573,7 @@ const CreditsManagement: React.FC = () => {
                   value={actionAmount}
                   onChange={(e) => setActionAmount(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="Enter credits amount"
+                  placeholder="Enter photo shoots amount"
                   min="1"
                   max={selectedUser.totalCredits}
                 />
@@ -585,7 +585,7 @@ const CreditsManagement: React.FC = () => {
                   value={actionReason}
                   onChange={(e) => setActionReason(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  placeholder="Enter reason for deducting credits"
+                  placeholder="Enter reason for deducting photo shoots"
                 />
               </div>
               <div className="flex space-x-3">
@@ -594,7 +594,7 @@ const CreditsManagement: React.FC = () => {
                   disabled={actionLoading || !actionAmount || !actionReason}
                   className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {actionLoading ? 'Processing...' : 'Deduct Credits'}
+                  {actionLoading ? 'Processing...' : 'Deduct Photo Shoots'}
                 </button>
                 <button
                   onClick={() => {

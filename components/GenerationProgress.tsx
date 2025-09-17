@@ -34,10 +34,10 @@ const GenerationProgress: React.FC<GenerationProgressProps> = ({
     <div className={`bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg ${className}`}>
       <div className="text-center mb-6">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-          Creating Your Wedding Portraits{animatedDots}
+          Running Your Photo Shoot{animatedDots}
         </h3>
         <p className="text-gray-600 dark:text-gray-400 text-sm">
-          AI is generating 3 unique styles for you
+          AI is creating 3 unique themed portraits for you
         </p>
       </div>
 
@@ -140,18 +140,18 @@ const GenerationProgress: React.FC<GenerationProgressProps> = ({
               const failed = progressData.filter(p => p.status === 'failed').length;
               
               if (completed === styles.length) {
-                return '✨ All portraits generated successfully!';
+                return '✨ Photo shoot complete! 3 beautiful portraits created!';
               } else if (completed + failed === styles.length) {
-                return `🎨 ${completed} portraits completed, ${failed} failed`;
+                return `🎨 Photo shoot done: ${completed} portraits created, ${failed} failed`;
               } else if (inProgress > 0) {
-                return `🎨 Processing ${inProgress} style${inProgress > 1 ? 's' : ''}, ${completed} completed...`;
+                return `📸 Creating portrait ${inProgress} of 3...`;
               } else {
-                return `⏳ Preparing to generate ${styles.length} wedding styles...`;
+                return `⏳ Preparing your photo shoot (3 portraits)...`;
               }
             } else {
               return completedCount === styles.length 
-                ? '✨ All portraits generated successfully!' 
-                : `Generating portrait ${Math.min(currentIndex + 1, styles.length)} of ${styles.length}...`;
+                ? '✨ Photo shoot complete! 3 beautiful portraits created!' 
+                : `Creating portrait ${Math.min(currentIndex + 1, styles.length)} of ${styles.length}...`;
             }
           })()} 
         </p>

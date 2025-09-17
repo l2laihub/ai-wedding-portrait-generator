@@ -364,6 +364,7 @@ serve(async (req) => {
               }, {
                 onConflict: 'stripe_subscription_id'
               })
+          }
 
           // Log subscription activity
           await supabase
@@ -377,12 +378,13 @@ serve(async (req) => {
                 plan_id: subscription.items?.data?.[0]?.price?.id
               }
             })
+          }
         }
         break
-      }
         
       default:
         console.log(`Unhandled event type: ${event.type}`)
+        break
     }
 
     return new Response(JSON.stringify({ received: true }), {

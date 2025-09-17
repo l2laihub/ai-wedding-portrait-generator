@@ -177,7 +177,7 @@ const SimpleHeader: React.FC<SimpleHeaderProps> = ({ onLogin, onProfile, onHelp,
             AI Wedding Portrait Generator
           </h2>
           <p className="text-sm md:text-xl text-gray-700 dark:text-gray-300 max-w-2xl mx-auto mb-4 md:mb-6 transition-colors duration-300">
-            Transform your couple photos into magical wedding portraits with AI
+            Every photo shoot creates 3 unique themed wedding portraits!
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 text-xs md:text-base">

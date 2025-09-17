@@ -20,7 +20,8 @@ const iconPaths = {
   menu: "M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
   close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
   logout: "M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z",
-  bell: "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"
+  bell: "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z",
+  prompt: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
 };
 
 const AdminLayoutSimple: React.FC<AdminLayoutProps> = ({ children, currentRoute, onRouteChange }) => {
@@ -31,6 +32,7 @@ const AdminLayoutSimple: React.FC<AdminLayoutProps> = ({ children, currentRoute,
     { name: 'Users', route: 'users', iconPath: iconPaths.users },
     { name: 'Generations', route: 'generations', iconPath: iconPaths.image },
     { name: 'Credits', route: 'credits', iconPath: iconPaths.creditCard },
+    { name: 'Prompts', route: 'prompts', iconPath: iconPaths.prompt },
     { name: 'Activity', route: 'activity', iconPath: iconPaths.activity },
     { name: 'Alerts', route: 'alerts', iconPath: iconPaths.alert },
     { name: 'Settings', route: 'settings', iconPath: iconPaths.settings },

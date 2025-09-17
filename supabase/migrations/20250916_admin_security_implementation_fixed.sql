@@ -271,6 +271,26 @@ COMMENT ON FUNCTION is_super_admin IS 'Check if user has super_admin role';
 COMMENT ON FUNCTION log_admin_action IS 'Securely log admin actions with validation';
 COMMENT ON FUNCTION create_admin_user IS 'Create admin user (system function only)';
 
+-- Add missing columns to admin_actions if they don't exist
+DO $$ 
+BEGIN
+  -- Add ip_address column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'admin_actions' AND column_name = 'ip_address'
+  ) THEN
+    ALTER TABLE admin_actions ADD COLUMN ip_address TEXT;
+  END IF;
+  
+  -- Add user_agent column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'admin_actions' AND column_name = 'user_agent'
+  ) THEN
+    ALTER TABLE admin_actions ADD COLUMN user_agent TEXT CHECK (length(user_agent) <= 500);
+  END IF;
+END $$;
+
 -- Migration completion log
 INSERT INTO admin_actions (
   admin_user_id,

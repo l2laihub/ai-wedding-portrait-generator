@@ -131,7 +131,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
               path="M12 4.5C7.5 4.5 4.73 7.5 4.5 12h-2c.28-5.5 4.53-9.5 9.5-9.5s9.22 4 9.5 9.5h-2c-.23-4.5-3-7.5-7.5-7.5zM12 19.5c-4.5 0-7.27-3-7.5-7.5h2c.23 4.5 3 7.5 7.5 7.5s7.27-3 7.5-7.5h2c-.28 5.5-4.53 9.5-9.5 9.5z" 
               className={`animate-spin ${isMobile ? 'w-5 h-5' : 'w-6 h-6'}`} 
             />
-            <span>{isMobile ? 'Creating Portraits...' : 'Generating Portraits...'}</span>
+            <span>{isMobile ? 'Creating Photo Shoot...' : 'Running Photo Shoot...'}</span>
           </>
         ) : (
           <>
@@ -140,7 +140,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
               className={isMobile ? 'w-5 h-5' : 'w-6 h-6'} 
             />
             <span>
-              {isMobile ? '🎨 Generate Portraits' : 'Generate 3 Wedding Styles'}
+              {isMobile ? '📸 Start Photo Shoot' : 'Start Photo Shoot (3 Images)'}
             </span>
           </>
         )}
@@ -148,7 +148,7 @@ const PromptInput: React.FC<PromptInputProps> = ({
 
       {isMobile && (
         <p className="text-xs text-gray-500 dark:text-gray-400 text-center px-2">
-          Generating 3 styles: Classic, Rustic Barn, and Bohemian Beach
+          Every photo shoot creates 3 unique themed portraits!
         </p>
       )}
     </div>

@@ -42,7 +42,7 @@ export interface RateLimitResult {
 
 class RateLimiter {
   private config: RateLimitConfig = {
-    FREE_DAILY: 5,
+    FREE_DAILY: 3,
     SESSION_KEY: 'wedai_usage',
     RESET_HOUR: 0 // midnight
   };
@@ -55,7 +55,7 @@ class RateLimiter {
     BLOCK_DURATION_MINUTES: 15 // 15 minute block
   };
 
-  // Display limit for UI (shows 3 to users while internal limit is 5)
+  // Display limit for UI (same as internal limit now)
   public readonly DISPLAY_LIMIT = 3;
 
   /**
