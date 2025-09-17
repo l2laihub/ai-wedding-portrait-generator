@@ -32,6 +32,7 @@ import {
   preloadCriticalComponents
 } from './components/LazyComponents';
 import { editImageWithNanoBanana } from './services/geminiService';
+import { secureGeminiService, userIdentificationService } from './services';
 import { GeneratedContent } from './types';
 import { useViewport } from './hooks/useViewport';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -176,20 +177,31 @@ function App({ navigate }: AppProps) {
       return;
     }
 
-    // Check credit balance before proceeding
-    let canProceed = true;
+    // Initialize user identification service
+    await userIdentificationService.initialize();
+    
+    // Check rate limits - different for authenticated vs anonymous users
     if (user) {
-      // For authenticated users, check credits service
+      // For authenticated users, check credit balance
       const balance = await creditsService.getBalance();
       if (!balance.canUseCredits) {
         setShowLimitModal(true);
         return;
       }
     } else {
-      // For anonymous users, use rate limiter
-      const limitCheck = rateLimiter.checkLimit();
-      if (!limitCheck.canProceed) {
+      // For anonymous users, check local rate limiter first
+      const localLimit = rateLimiter.checkLimit();
+      if (!localLimit.canProceed) {
         setShowLimitModal(true);
+        setError(`You've used all 3 free photo shoots today (${localLimit.total - localLimit.remaining}/3). Each photo shoot creates 3 images!`);
+        return;
+      }
+      
+      // Also check backend rate limits to ensure consistency
+      const backendLimit = await secureGeminiService.checkRateLimit();
+      if (!backendLimit.canProceed) {
+        setShowLimitModal(true);
+        setError(`Rate limit reached. Please try again later.`);
         return;
       }
     }
@@ -207,27 +219,11 @@ function App({ navigate }: AppProps) {
     }));
     setGenerationProgress(initialProgress);
 
-    // Consume a credit for this generation
-    let creditConsumed = false;
-    if (user) {
-      const consumeResult = await creditsService.consumeCredit(`Portrait generation - ${photoType}`);
-      if (!consumeResult.success) {
-        setError(consumeResult.error || 'Failed to consume credit');
-        setIsLoading(false);
-        return;
-      }
-      creditConsumed = true;
-    } else {
-      const creditResult = rateLimiter.consumeCredit();
-      creditConsumed = creditResult.canProceed;
-    }
-    
     // Generate unique ID for this generation session
     const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setCurrentGenerationId(generationId);
 
     try {
-      
       // Track generation started
       posthogService.trackGenerationStarted(generationId, {
         styles: stylesToGenerate,
@@ -241,240 +237,123 @@ function App({ navigate }: AppProps) {
         await databaseService.trackUsage(generationId, photoType, style);
       });
       
-      // Adjust generation strategy for slow connections or feature flag
-      const generateSequentially = (isSlowConnection && isMobile) || featureFlags.enable_sequential_generation;
+      // Use secure backend for generation
+      console.log(`🎨 Generating ${stylesToGenerate.length} styles using secure backend`);
       
-      if (generateSequentially) {
-        // Generate one at a time to reduce network load
-        const finalContents: GeneratedContent[] = [];
-        for (let i = 0; i < stylesToGenerate.length; i++) {
-          const style = stylesToGenerate[i];
-          
-          // Update progress: mark current style as in progress
+      const generationResult = await secureGeminiService.generateMultiplePortraits(
+        sourceImageFile,
+        stylesToGenerate,
+        customPrompt,
+        photoType,
+        familyMemberCount,
+        (style, status) => {
+          // Update progress in real-time as each style is processed
           setGenerationProgress(prev => prev.map(p => 
             p.style === style 
-              ? { ...p, status: 'in_progress', startTime: Date.now() }
+              ? { ...p, status, startTime: status === 'in_progress' ? Date.now() : p.startTime }
+              : p
+          ));
+        }
+      );
+      
+      // Process results
+      const finalContents: GeneratedContent[] = [];
+      
+      for (const result of generationResult.results) {
+        if (result.success && result.data) {
+          // Update progress: mark as completed
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === result.style 
+              ? { ...p, status: 'completed' }
               : p
           ));
           
-          // image prompts are long, so we track each style generation separately
-          console.log(`🎨 Generating style "${style}" with photoType: "${photoType}"`);
-          const prompt = photoType === 'single'
-            ? `Transform the SINGLE PERSON in this image into a FULL BODY wedding portrait with a "${style}" theme. This is a SINGLE PERSON portrait - NOT a couple. Create a professional bridal/groom portrait showing them ALONE in ${getStylePose(style)}. Keep their face EXACTLY identical to the original - preserve ALL facial features, expressions, and complete likeness. Show the complete wedding outfit from head to toe, including dress/suit details, shoes, and accessories. The subject should be in a flattering, professional modeling pose appropriate for the wedding style. ${customPrompt}. Ensure their face remains perfectly consistent and unchanged from the original photo while creating a stunning full-length INDIVIDUAL portrait.`
-            : photoType === 'couple' 
-            ? `Transform the TWO PEOPLE (couple) in this image into a beautiful wedding portrait with a "${style}" theme. This is a COUPLE portrait - there should be TWO people in the result. Keep BOTH their faces EXACTLY identical to the original - preserve their facial features, expressions, and likeness completely. Maintain BOTH subjects' identity while transforming only their clothing and background to match the wedding style. ${customPrompt}. Make them look like they are dressed for a wedding in that style, but ensure BOTH faces remain perfectly consistent and unchanged from the original photo.`
-            : `${numberToWord(familyMemberCount)} people family photo: Transform this family into a beautiful wedding portrait with a "${style}" theme. Crucially, preserve the exact likeness of EACH and EVERY family member's face and unique facial features. Only transform their clothing and the environment. Ensure all ${numberToWord(familyMemberCount)} individuals from the original photo are present and their identity is clearly recognizable. ${customPrompt}`;
+          // Track successful style generation
+          posthogService.trackStyleGenerated({
+            style: result.style,
+            generationId,
+            duration: result.processing_time_ms || 0,
+            success: true,
+          });
           
-          try {
-            const styleStartTime = Date.now();
-            const content = await editImageWithNanoBanana(sourceImageFile, prompt);
-            const styleDuration = Date.now() - styleStartTime;
-            
-            // Update progress: mark as completed
-            setGenerationProgress(prev => prev.map(p => 
-              p.style === style 
-                ? { ...p, status: 'completed' }
-                : p
-            ));
-            
-            // Track successful style generation
-            posthogService.trackStyleGenerated({
-              style,
-              generationId,
-              duration: styleDuration,
-              success: true,
-            });
-            
-            finalContents.push({ ...content, style });
-          } catch (err) {
-            const styleDuration = Date.now() - (Date.now() - 1000); // Approximate
-            console.error(`Error generating style "${style}":`, err);
-            
-            // Update progress: mark as failed
-            setGenerationProgress(prev => prev.map(p => 
-              p.style === style 
-                ? { ...p, status: 'failed' }
-                : p
-            ));
-            
-            // Track failed style generation
-            posthogService.trackStyleGenerated({
-              style,
-              generationId,
-              duration: styleDuration,
-              success: false,
-              error: err instanceof Error ? err.message : 'Unknown error',
-            });
-            
-            finalContents.push({
-              imageUrl: null,
-              text: err instanceof Error ? err.message : 'An unknown error occurred.',
-              style,
-            });
-          }
+          finalContents.push(result.data);
+        } else {
+          // Update progress: mark as failed
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === result.style 
+              ? { ...p, status: 'failed' }
+              : p
+          ));
           
-          // Update UI with partial results for better UX
-          setGeneratedContents([...finalContents]);
+          // Track failed style generation
+          posthogService.trackStyleGenerated({
+            style: result.style,
+            generationId,
+            duration: result.processing_time_ms || 0,
+            success: false,
+            error: result.error || 'Unknown error',
+          });
+          
+          finalContents.push({
+            imageUrl: null,
+            text: result.error || 'Generation failed',
+            style: result.style,
+          });
         }
+      }
+      
+      // Handle credit consumption for successful generations
+      if (user && generationResult.successful > 0) {
+        const consumeResult = await creditsService.consumeCredit(`Portrait generation - ${photoType}`);
+        if (!consumeResult.success) {
+          console.warn('Failed to consume credit after generation:', consumeResult.error);
+        }
+      } else if (!user && generationResult.successful > 0) {
+        // For anonymous users, consume from rate limiter
+        const limitResult = rateLimiter.consumeCredit();
         
-        // Track generation completed for sequential mode
-        const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
-        const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
-        posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
-        
-        // Increment counter for successful generation with enhanced metadata
-        incrementCounterWithMetadata(
-          generationId,
-          successfulStyles.length,
-          stylesToGenerate.length,
-          photoType,
-          stylesToGenerate,
-          customPrompt
+        // Force counter update event to ensure UI syncs
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: limitResult.remaining }
+        }));
+      }
+      
+      // Set final results
+      setGeneratedContents(finalContents);
+      
+      // Track generation completed
+      const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
+      const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
+      posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
+      
+      // Increment counter for successful generation with enhanced metadata
+      incrementCounterWithMetadata(
+        generationId,
+        successfulStyles.length,
+        stylesToGenerate.length,
+        photoType,
+        stylesToGenerate,
+        customPrompt
+      );
+      
+      // Handle error messages based on results
+      if (failedStyles.length > 0) {
+        const hasRateLimitError = finalContents.some(c => 
+          c.imageUrl === null && 
+          (c.text?.includes('quota') || c.text?.includes('limit') || c.text?.includes('Rate limit') || c.text?.includes('popular today'))
         );
         
-        // Check for errors in sequential mode
-        if (failedStyles.length > 0) {
-          const hasRateLimitError = finalContents.some(c => 
-            c.imageUrl === null && 
-            (c.text?.includes('quota') || c.text?.includes('limit') || c.text?.includes('popular today'))
-          );
-          
-          const hasServerError = finalContents.some(c => 
-            c.imageUrl === null && 
-            (c.text?.includes('Server temporarily unavailable') || c.text?.includes('internal error'))
-          );
-          
-          if (hasRateLimitError) {
-            setError(`Some portrait styles hit our daily limits, but ${successfulStyles.length} succeeded! 🎆`);
-          } else if (hasServerError) {
-            setError(`${successfulStyles.length} portraits generated successfully! ${failedStyles.length} styles experienced server issues but you can try regenerating them. 🔄`);
-          } else {
-            setError(`${successfulStyles.length} portraits are ready! ${failedStyles.length} styles encountered issues - try adjusting your prompt or photo. ✨`);
-          }
-        }
-      } else {
-        // Generate all styles concurrently (original behavior)
-        // Mark all styles as in progress at the start
-        setGenerationProgress(prev => prev.map(p => ({
-          ...p, 
-          status: 'in_progress' as const, 
-          startTime: Date.now()
-        })));
-        
-        const generationPromises = stylesToGenerate.map(style => {
-          const styleStartTime = Date.now();
-          console.log(`🎨 Generating style "${style}" with photoType: "${photoType}"`);
-          const prompt = photoType === 'single'
-            ? `Transform the SINGLE PERSON in this image into a FULL BODY wedding portrait with a "${style}" theme. This is a SINGLE PERSON portrait - NOT a couple. Create a professional bridal/groom portrait showing them ALONE in ${getStylePose(style)}. Keep their face EXACTLY identical to the original - preserve ALL facial features, expressions, and complete likeness. Show the complete wedding outfit from head to toe, including dress/suit details, shoes, and accessories. The subject should be in a flattering, professional modeling pose appropriate for the wedding style. ${customPrompt}. Ensure their face remains perfectly consistent and unchanged from the original photo while creating a stunning full-length INDIVIDUAL portrait.`
-            : photoType === 'couple' 
-            ? `Transform the TWO PEOPLE (couple) in this image into a beautiful wedding portrait with a "${style}" theme. This is a COUPLE portrait - there should be TWO people in the result. Keep BOTH their faces EXACTLY identical to the original - preserve their facial features, expressions, and likeness completely. Maintain BOTH subjects' identity while transforming only their clothing and background to match the wedding style. ${customPrompt}. Make them look like they are dressed for a wedding in that style, but ensure BOTH faces remain perfectly consistent and unchanged from the original photo.`
-            : `${numberToWord(familyMemberCount)} people family photo: Transform this family into a beautiful wedding portrait with a "${style}" theme. Crucially, preserve the exact likeness of EACH and EVERY family member's face and unique facial features. Only transform their clothing and the environment. Ensure all ${numberToWord(familyMemberCount)} individuals from the original photo are present and their identity is clearly recognizable. ${customPrompt}`;
-          
-          return editImageWithNanoBanana(sourceImageFile, prompt)
-            .then(content => {
-              const styleDuration = Date.now() - styleStartTime;
-              
-              // Update progress: mark as completed
-              setGenerationProgress(prev => prev.map(p => 
-                p.style === style 
-                  ? { ...p, status: 'completed' }
-                  : p
-              ));
-              
-              // Track successful style generation
-              posthogService.trackStyleGenerated({
-                style,
-                generationId,
-                duration: styleDuration,
-                success: true,
-              });
-              
-              return { ...content, style };
-            })
-            .catch(err => {
-              const styleDuration = Date.now() - styleStartTime;
-              
-              // Update progress: mark as failed
-              setGenerationProgress(prev => prev.map(p => 
-                p.style === style 
-                  ? { ...p, status: 'failed' }
-                  : p
-              ));
-              
-              // Track failed style generation
-              posthogService.trackStyleGenerated({
-                style,
-                generationId,
-                duration: styleDuration,
-                success: false,
-                error: err instanceof Error ? err.message : 'Unknown error',
-              });
-              
-              throw err;
-            });
-        });
-        
-        const results = await Promise.allSettled(generationPromises);
-
-        const finalContents = results.map((result, index) => {
-          if (result.status === 'fulfilled') {
-            return result.value;
-          } else {
-            console.error(`Error generating style "${stylesToGenerate[index]}":`, result.reason);
-            return {
-              imageUrl: null,
-              text: result.reason instanceof Error ? result.reason.message : 'An unknown error occurred.',
-              style: stylesToGenerate[index],
-            };
-          }
-        });
-        
-        setGeneratedContents(finalContents);
-        
-        // Track generation completed for concurrent mode
-        const successfulStyles = results
-          .filter((result, index) => result.status === 'fulfilled')
-          .map((_, index) => stylesToGenerate[index]);
-        const failedStyles = results
-          .filter((result, index) => result.status === 'rejected')
-          .map((_, index) => stylesToGenerate[index]);
-        posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
-        
-        // Increment counter for successful generation with enhanced metadata
-        incrementCounterWithMetadata(
-          generationId,
-          successfulStyles.length,
-          stylesToGenerate.length,
-          photoType,
-          stylesToGenerate,
-          customPrompt
+        const hasServerError = finalContents.some(c => 
+          c.imageUrl === null && 
+          (c.text?.includes('Server temporarily unavailable') || c.text?.includes('internal error'))
         );
-
-        if (results.some(r => r.status === 'rejected')) {
-          const failedCount = results.filter(r => r.status === 'rejected').length;
-          const successCount = results.filter(r => r.status === 'fulfilled').length;
-          
-          // Check if failures are due to rate limiting
-          const hasRateLimitError = results.some(r => 
-            r.status === 'rejected' && 
-            r.reason instanceof Error && 
-            (r.reason.message.includes('quota') || r.reason.message.includes('limit') || r.reason.message.includes('popular today'))
-          );
-          
-          // Check if failures are due to server errors
-          const hasServerError = results.some(r => 
-            r.status === 'rejected' && 
-            r.reason instanceof Error && 
-            (r.reason.message.includes('Server temporarily unavailable') || r.reason.message.includes('internal error'))
-          );
-          
-          if (hasRateLimitError) {
-            setError(`Some portrait styles hit our daily limits, but ${successCount} succeeded! 🎆`);
-          } else if (hasServerError) {
-            setError(`${successCount} portraits generated successfully! ${failedCount} styles experienced server issues - you can try regenerating for different styles. 🔄`);
-          } else {
-            setError(`${successCount} portraits are ready! ${failedCount} styles encountered issues - try adjusting your prompt or photo for better results. ✨`);
-          }
+        
+        if (hasRateLimitError) {
+          setError(`Some portrait styles hit rate limits, but ${successfulStyles.length} succeeded! 🎆`);
+        } else if (hasServerError) {
+          setError(`${successfulStyles.length} portraits generated successfully! ${failedStyles.length} styles experienced server issues but you can try regenerating them. 🔄`);
+        } else {
+          setError(`${successfulStyles.length} portraits are ready! ${failedStyles.length} styles encountered issues - try adjusting your prompt or photo. ✨`);
         }
       }
 
@@ -960,9 +839,10 @@ function App({ navigate }: AppProps) {
       <LimitReachedModal 
         isOpen={showLimitModal}
         onClose={() => setShowLimitModal(false)}
-        onEmailSubmitted={(email) => {
-          console.log('Email submitted to waitlist:', email);
-          // TODO: Integrate with Supabase when database is setup
+        onPurchase={handlePurchase}
+        onShowLoginModal={(mode) => {
+          setLoginMode(mode);
+          setShowLoginModal(true);
         }}
       />
       

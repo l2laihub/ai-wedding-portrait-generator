@@ -548,7 +548,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
         <div className="mt-8 space-y-6">
           {/* App Description */}
           <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-xl p-4 text-center shadow-lg">
-            <div className="text-sm mb-2">Transform your couple photos into magical AI-generated wedding portraits</div>
+            <div className="text-sm mb-2">Every photo shoot creates 3 unique themed wedding portraits</div>
             <div className="text-xs text-gray-200">Completely free, privacy-first, and optimized for all devices</div>
             <div className="flex justify-center gap-2 mt-3 text-xs">
               <span className="flex items-center gap-1">❤️ Made with Love</span>
@@ -606,9 +606,10 @@ const MobileApp: React.FC<MobileAppProps> = ({
       <LimitReachedModal 
         isOpen={showLimitModal && !isMaintenanceMode}
         onClose={() => setShowLimitModal(false)}
-        onEmailSubmitted={(email) => {
-          console.log('Email submitted:', email);
-          showSuccess('Added to waitlist!');
+        onPurchase={handlePurchase}
+        onShowLoginModal={(mode) => {
+          setLoginMode(mode);
+          setShowLoginModal(true);
         }}
       />
       

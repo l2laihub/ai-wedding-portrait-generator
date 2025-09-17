@@ -26,6 +26,14 @@ const LoginModal: React.FC<LoginModalProps> = ({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Update internal mode when defaultMode prop changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(defaultMode);
+      resetForm(); // Clear form when mode changes
+    }
+  }, [defaultMode, isOpen]);
+
   // Form data
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -172,14 +180,16 @@ const LoginModal: React.FC<LoginModalProps> = ({
     <div 
       className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto animate-in fade-in duration-200"
       onClick={handleBackdropClick}
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
+      }}
     >
-      <div className="min-h-screen flex items-start justify-center p-4 pt-16 pb-20">
+      <div className="min-h-full flex items-center justify-center p-4">
         <div 
           className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
-          style={{ 
-            maxHeight: 'calc(100vh - 8rem)'
-          }}
+          style={{ maxHeight: 'calc(100vh - 2rem)' }}
         >
         {/* Header */}
         <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
