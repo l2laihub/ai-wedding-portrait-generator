@@ -137,16 +137,24 @@ const LimitReachedModal: React.FC<LimitReachedModalProps> = ({
   };
 
   const handleCreateAccount = () => {
+    console.log('🔍 LimitReachedModal: handleCreateAccount called, onShowLoginModal:', !!onShowLoginModal);
     if (onShowLoginModal) {
-      onShowLoginModal('signup');
+      onClose(); // Close this modal first
+      setTimeout(() => {
+        onShowLoginModal('signup');
+      }, 100); // Small delay to ensure smooth transition
     } else {
       console.warn('No login modal handler provided');
     }
   };
 
   const handleSignIn = () => {
+    console.log('🔍 LimitReachedModal: handleSignIn called, onShowLoginModal:', !!onShowLoginModal);
     if (onShowLoginModal) {
-      onShowLoginModal('signin');
+      onClose(); // Close this modal first
+      setTimeout(() => {
+        onShowLoginModal('signin');
+      }, 100); // Small delay to ensure smooth transition
     } else {
       console.warn('No login modal handler provided');
     }
