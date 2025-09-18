@@ -33,7 +33,7 @@ interface RateLimitResult {
 
 // Rate limiting configuration
 const RATE_LIMITS = {
-  anonymous: { hourly: 3, daily: 3 },
+  anonymous: { hourly: 9, daily: 9 }, // Daily limit only - 3 photo shoots per day (3 portraits each)
   authenticated: { hourly: 30, daily: 100 },
   premium: { hourly: 100, daily: 500 }
 }

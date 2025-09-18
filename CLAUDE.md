@@ -84,3 +84,6 @@ Uses Tailwind CSS classes throughout with a dark theme (bg-gray-900 base).
 
 ## Security Memories
 - Add to `.gitignore` and remove all test scripts that contain credentials, API keys, or secrets to prevent accidental exposure
+
+## Deployment Considerations
+- Remember to deploy portrait-generation and stripe-webhook as no jwt, since they will break production if not
