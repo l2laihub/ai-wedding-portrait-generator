@@ -22,9 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-# .env file
+# Environment files and secrets
 .env
 .env.local
 .env.*.local
+.env.*.bak*
+.env.backup
+*.key
+*secret*
+*credentials*
+
+# Documentation with sensitive info
+*oauth*fix*.md
+*secret*setup*.md
 
 #.claude-flow
