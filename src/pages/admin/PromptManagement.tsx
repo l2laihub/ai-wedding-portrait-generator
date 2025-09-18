@@ -141,26 +141,29 @@ const PromptManagement: React.FC = () => {
   };
 
   const handleEnhancedModeToggle = async (enabled: boolean) => {
-    setEnhancedMode(enabled);
-    unifiedThemeService.setEnhancedMode(enabled);
-    
-    // Reload themes with new mode
     try {
+      setEnhancedMode(enabled);
+      unifiedThemeService.setEnhancedMode(enabled);
+      
+      // Reload themes with new mode
       const themes = await unifiedThemeService.getThemeNames();
       const status = await unifiedThemeService.getSystemStatus();
       
       setWeddingStyles(themes);
       setSystemStatus(status);
       
-      // Reload filtered themes for the browser
-      await loadFilteredThemes();
-      
       setSuccess(enabled ? 
         'Enhanced mode enabled - Using database themes' : 
         'Enhanced mode disabled - Using legacy themes'
       );
+      
+      // Clear any previous errors
+      setError(null);
     } catch (error) {
+      console.error('Error toggling enhanced mode:', error);
       setError('Failed to switch theme mode');
+      // Revert the mode on error
+      setEnhancedMode(!enabled);
     }
   };
 

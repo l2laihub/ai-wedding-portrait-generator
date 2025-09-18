@@ -255,6 +255,35 @@ class RateLimiter {
   }
 
   /**
+   * Restore one credit (call this when generation fails after consuming)
+   */
+  public restoreCredit(): RateLimitResult {
+    const usage = this.getUsageData();
+    
+    console.log('restoreCredit called:', {
+      currentUsage: usage.used,
+      canRestore: usage.used > 0
+    });
+    
+    if (usage.used <= 0) {
+      console.warn('Attempted to restore credit but usage is already 0');
+      return this.checkLimit();
+    }
+
+    // Decrement usage
+    usage.used -= 1;
+    this.saveUsageData(usage);
+    
+    const newLimit = this.checkLimit();
+    console.log('Credit restored successfully:', {
+      newUsage: usage.used,
+      remaining: newLimit.remaining
+    });
+    
+    return newLimit;
+  }
+
+  /**
    * Strict validation - returns true if user definitely CANNOT proceed
    */
   public isStrictlyAtLimit(): boolean {

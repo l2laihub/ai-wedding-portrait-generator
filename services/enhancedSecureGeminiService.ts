@@ -252,10 +252,7 @@ class EnhancedSecureGeminiService {
         request_id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[EnhancedSecureGeminiService] Making API call with enhanced prompt')
-        console.log('[EnhancedSecureGeminiService] Prompt preview:', finalPrompt.substring(0, 200) + '...')
-      }
+      // Prompt logging removed for production security
 
       const result = await this.callBackendAPI(requestData)
 

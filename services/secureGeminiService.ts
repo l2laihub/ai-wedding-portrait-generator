@@ -338,19 +338,7 @@ class SecureGeminiService {
     const generateStylePortrait = async (style: string) => {
       const prompt = await generatePrompt(style)
       
-      // Debug logging for final prompt (development only)
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`\n🎯 [FINAL PROMPT DEBUG] Style: ${style}`);
-        console.log(`📝 Photo Type: ${photoType}`);
-        console.log(`💬 Custom Prompt: "${customPrompt || '(empty)'}"`);
-        if (photoType === 'family') {
-          console.log(`👨‍👩‍👧‍👦 Family Members: ${familyMemberCount}`);
-        }
-        console.log(`📄 Full Prompt (${prompt.length} chars):`);
-        console.log('=====================================');
-        console.log(prompt);
-        console.log('=====================================\n');
-      }
+      // Prompt logging removed for production security
       
       try {
         // Notify that generation is starting

@@ -70,7 +70,8 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
     };
 
     // Listen for counter update events for real-time synchronization
-    const handleCounterUpdate = () => {
+    const handleCounterUpdate = (event?: CustomEvent) => {
+      if (import.meta.env.DEV) console.log('UsageCounter: Received counterUpdate event', event?.detail);
       updateUsageInfo();
     };
 
@@ -102,18 +103,27 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
     total = creditBalance?.totalAvailable || 0;
     used = creditBalance?.freeCreditsUsed || 0;
   } else {
-    // Force fresh check for anonymous users to handle localStorage clearing
-    const freshStats = rateLimiter.getUsageStats();
-    remaining = Math.max(0, Math.min(freshStats.remaining, displayLimit));
-    total = displayLimit;
-    used = Math.min(freshStats.used, displayLimit);
+    // Always use the stored limitInfo state for consistency with App.tsx limit handling
+    if (limitInfo) {
+      remaining = limitInfo.remaining;
+      total = limitInfo.total;
+      used = total - remaining;
+    } else {
+      // Only use fresh stats as initial fallback when limitInfo is not available
+      const freshStats = rateLimiter.getUsageStats();
+      remaining = Math.max(0, Math.min(freshStats.remaining, displayLimit));
+      total = displayLimit;
+      used = Math.min(freshStats.used, displayLimit);
+    }
     
     console.log('UsageCounter display values:', {
-      freshStats,
+      limitInfo,
       remaining,
       total,
       used,
-      limitInfo
+      source: limitInfo ? 'limitInfo' : 'freshStats',
+      isAuthenticated,
+      statusColor: remaining === 0 ? 'red' : remaining <= 2 ? 'amber' : 'green'
     });
   }
 
@@ -143,9 +153,13 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
         <span className={`font-medium ${getStatusColor()}`}>
           {isAuthenticated ? (
             creditBalance?.totalAvailable ? (
-              creditBalance.freeCreditsRemaining > 0 ? 
-                `${Math.min(creditBalance.freeCreditsRemaining, 3)}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} photo shoots` :
+              creditBalance.freeCreditsRemaining > 0 ? (
+                creditBalance.paidCredits + creditBalance.bonusCredits > 0 ?
+                  `${Math.min(creditBalance.freeCreditsRemaining, 3)}/3 free + ${creditBalance.paidCredits + creditBalance.bonusCredits} photo shoots` :
+                  `${Math.min(creditBalance.freeCreditsRemaining, 3)}/3 free photo shoots available (${Math.min(creditBalance.freeCreditsRemaining, 3) * 3} images)`
+              ) : (
                 `${creditBalance.totalAvailable} photo shoots available`
+              )
             ) : (
               '0 photo shoots remaining'
             )

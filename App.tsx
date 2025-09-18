@@ -432,12 +432,8 @@ function App({ navigate }: AppProps) {
         if (!consumeResult.success) {
           console.warn('Failed to consume credit after generation:', consumeResult.error);
         }
-      } else if (!user && generationResult.successful > 0) {
-        const limitResult = rateLimiter.consumeCredit();
-        window.dispatchEvent(new CustomEvent('counterUpdate', {
-          detail: { remaining: limitResult.remaining }
-        }));
       }
+      // Note: For anonymous users, credit is now consumed BEFORE API call to prevent rate limit issues
       
       setGeneratedContents(finalContents);
       
@@ -525,15 +521,21 @@ function App({ navigate }: AppProps) {
         setShowLimitModal(true);
         setError(`Daily limit reached: You've used all 3 free photo shoots today. Come back tomorrow for 3 more!`);
         
-        // Force UI counter update immediately
-        const currentStats = rateLimiter.getUsageStats();
+        // Force UI counter update immediately to show 0 remaining
         window.dispatchEvent(new CustomEvent('counterUpdate', {
           detail: { remaining: 0 }
         }));
         return;
       }
       
-      console.log('✅ Anonymous user rate limit check passed');
+      // Consume credit BEFORE API call to ensure accurate tracking
+      const limitResult = rateLimiter.consumeCredit();
+      console.log('✅ Anonymous user rate limit check passed, credit consumed proactively');
+      
+      // Update UI immediately to show correct remaining count
+      window.dispatchEvent(new CustomEvent('counterUpdate', {
+        detail: { remaining: limitResult.remaining }
+      }));
     }
 
     // Initialize user identification service
@@ -658,21 +660,40 @@ function App({ navigate }: AppProps) {
         }
       }
       
-      // Handle credit consumption for successful generations
+      // Handle credit consumption for successful generations  
       if (user && generationResult.successful > 0) {
         const consumeResult = await creditsService.consumeCredit(`Portrait generation - ${photoType}`);
         if (!consumeResult.success) {
           console.warn('Failed to consume credit after generation:', consumeResult.error);
         }
-      } else if (!user && generationResult.successful > 0) {
-        // For anonymous users, consume from rate limiter
-        const limitResult = rateLimiter.consumeCredit();
-        
-        // Force counter update event to ensure UI syncs
-        window.dispatchEvent(new CustomEvent('counterUpdate', {
-          detail: { remaining: limitResult.remaining }
-        }));
       }
+      
+      // For anonymous users: Check if ALL generations failed due to rate limiting
+      if (!user && generationResult.successful === 0) {
+        const hasRateLimitError = generationResult.results.some(result => 
+          result.error && (
+            result.error.includes('Daily limit') || 
+            result.error.includes('rate limit') ||
+            result.error.includes('Rate limit')
+          )
+        );
+        
+        if (hasRateLimitError) {
+          console.log('🔄 All generations failed due to rate limiting - showing limit modal');
+          // Don't restore credit - keep it consumed to maintain accurate count
+          // The user has hit their limit and should see 0 remaining
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: 0 }
+          }));
+          
+          // Show limit modal instead of continuing with error display
+          setShowLimitModal(true);
+          setIsLoading(false); // Stop loading immediately
+          return;
+        }
+      }
+      
+      // Note: For anonymous users, credit is consumed BEFORE API call to ensure accurate tracking
       
       // Set final results
       setGeneratedContents(finalContents);
@@ -726,6 +747,15 @@ function App({ navigate }: AppProps) {
       
       // Track generation failure
       posthogService.trackGenerationFailed(generationId, errorMessage);
+      
+      // If generation failed completely for anonymous user, restore the consumed credit
+      if (!user && errorMessage.includes('Daily limit')) {
+        console.log('🔄 Restoring credit for anonymous user due to rate limit failure');
+        rateLimiter.restoreCredit();
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: rateLimiter.getUsageStats().remaining }
+        }));
+      }
       
       setError(errorMessage);
     } finally {
