@@ -227,10 +227,10 @@ class EnhancedSecureGeminiService {
       } else if (prompt) {
         // Use provided prompt directly
         finalPrompt = prompt
-        console.log('[EnhancedSecureGeminiService] Using provided prompt')
+        if (process.env.NODE_ENV === 'development') console.log('[EnhancedSecureGeminiService] Using provided prompt')
       } else {
         // Fallback to enhanced prompt service
-        console.log('[EnhancedSecureGeminiService] Using fallback enhanced prompt generation')
+        if (process.env.NODE_ENV === 'development') console.log('[EnhancedSecureGeminiService] Using fallback enhanced prompt generation')
         finalPrompt = await enhancedPromptService.generateEnhancedPrompt(
           portraitType,
           style || 'Classic Wedding',
@@ -252,8 +252,10 @@ class EnhancedSecureGeminiService {
         request_id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       }
 
-      console.log('[EnhancedSecureGeminiService] Making API call with enhanced prompt')
-      console.log('[EnhancedSecureGeminiService] Prompt preview:', finalPrompt.substring(0, 200) + '...')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EnhancedSecureGeminiService] Making API call with enhanced prompt')
+        console.log('[EnhancedSecureGeminiService] Prompt preview:', finalPrompt.substring(0, 200) + '...')
+      }
 
       const result = await this.callBackendAPI(requestData)
 

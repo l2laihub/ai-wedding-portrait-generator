@@ -267,7 +267,7 @@ class MigrationService {
       
       // In a real implementation, this would write to file system or cloud storage
       console.log('[MigrationService] Backup created:', backupLocation);
-      console.log('[MigrationService] Backup data:', JSON.stringify(backupData, null, 2));
+      if (import.meta.env.DEV) console.log('[MigrationService] Backup data:', JSON.stringify(backupData, null, 2));
       
       return { backupLocation };
     } catch (error) {

@@ -57,19 +57,19 @@ export interface SystemStatus {
 
 class AdminService {
   private async isAdmin(): Promise<boolean> {
-    console.log('🔍 isAdmin: checking auth user...');
+    if (import.meta.env.DEV) console.log('🔍 isAdmin: checking auth user...');
     const { data: { user }, error } = await supabase.auth.getUser();
-    console.log('🔍 isAdmin: user =', user?.email, 'error =', error);
+    if (import.meta.env.DEV) console.log('🔍 isAdmin: user =', user?.email, 'error =', error);
     
     if (!user) {
-      console.log('🔍 isAdmin: no user found');
+      if (import.meta.env.DEV) console.log('🔍 isAdmin: no user found');
       return false;
     }
 
     // Temporary: Check if user is admin@huybuilds.app directly
     // TODO: Replace with proper admin_users table lookup once migration is applied
     if (user.email === 'admin@huybuilds.app') {
-      console.log('🔍 isAdmin: admin email match = true');
+      if (import.meta.env.DEV) console.log('🔍 isAdmin: admin email match = true');
       return true;
     }
 
@@ -89,10 +89,10 @@ class AdminService {
   }
 
   async getDashboardMetrics(): Promise<DashboardMetrics> {
-    console.log('🔍 getDashboardMetrics called');
+    if (import.meta.env.DEV) console.log('🔍 getDashboardMetrics called');
     
     const isAdminUser = await this.isAdmin();
-    console.log('🔍 isAdmin result:', isAdminUser);
+    if (import.meta.env.DEV) console.log('🔍 isAdmin result:', isAdminUser);
     
     if (!isAdminUser) {
       throw new Error('Unauthorized: Admin access required');
@@ -120,7 +120,7 @@ class AdminService {
       }
 
       const dashboardData = await response.json();
-      console.log('🔍 Received dashboard data:', dashboardData);
+      if (import.meta.env.DEV) console.log('🔍 Received dashboard data:', dashboardData);
       
       // Store the comprehensive data for other methods to use
       this.cachedDashboardData = dashboardData;
@@ -238,7 +238,7 @@ class AdminService {
     try {
       // If we have cached dashboard data, use it
       if (this.cachedDashboardData?.chartData) {
-        console.log('🔍 Using cached chart data');
+        if (import.meta.env.DEV) console.log('🔍 Using cached chart data');
         return this.cachedDashboardData.chartData;
       }
 
@@ -455,7 +455,7 @@ class AdminService {
     try {
       // If we have cached dashboard data, use it
       if (this.cachedDashboardData?.recentActivity) {
-        console.log('🔍 Using cached recent activity');
+        if (import.meta.env.DEV) console.log('🔍 Using cached recent activity');
         return this.cachedDashboardData.recentActivity;
       }
 
@@ -478,7 +478,7 @@ class AdminService {
     try {
       // If we have cached dashboard data, use it
       if (this.cachedDashboardData?.systemStatus) {
-        console.log('🔍 Using cached system status');
+        if (import.meta.env.DEV) console.log('🔍 Using cached system status');
         return this.cachedDashboardData.systemStatus;
       }
 
@@ -566,15 +566,15 @@ class AdminService {
 
       if (usersError) throw usersError;
 
-      console.log('🔍 Raw users data:', JSON.stringify(usersData, null, 2));
+      if (import.meta.env.DEV) console.log('🔍 Raw users data:', JSON.stringify(usersData, null, 2));
 
       // Get user credits separately to debug
       const { data: allCredits, error: creditsError } = await supabase
         .from('user_credits')
         .select('*');
       
-      console.log('🔍 All user_credits records:', JSON.stringify(allCredits, null, 2));
-      if (creditsError) console.error('🔍 Credits error:', creditsError);
+      if (import.meta.env.DEV) console.log('🔍 All user_credits records:', JSON.stringify(allCredits, null, 2));
+      if (creditsError && import.meta.env.DEV) console.error('🔍 Credits error:', creditsError);
 
       // Get all credit transactions
       const { data: transactionsData, error: transactionsError } = await supabase
@@ -593,7 +593,7 @@ class AdminService {
 
       if (transactionsError) throw transactionsError;
 
-      console.log('🔍 Raw transactions data:', transactionsData);
+      if (import.meta.env.DEV) console.log('🔍 Raw transactions data:', transactionsData);
 
       // Get today's usage for each user
       const today = new Date().toISOString().split('T')[0];
@@ -635,7 +635,7 @@ class AdminService {
           console.warn(`Failed to get credits for user ${user.email}:`, error);
         }
         
-        console.log(`🔍 User ${user.email} credits from RPC:`, credits);
+        if (import.meta.env.DEV) console.log(`🔍 User ${user.email} credits from RPC:`, credits);
         
         return {
           id: user.id,
@@ -699,9 +699,9 @@ class AdminService {
         conversionRate: users.length > 0 ? (payingUsers / users.length) * 100 : 0
       };
 
-      console.log('🔍 Final stats:', stats);
-      console.log('🔍 Users count:', users.length);
-      console.log('🔍 Transactions count:', transactions.length);
+      if (import.meta.env.DEV) console.log('🔍 Final stats:', stats);
+      if (import.meta.env.DEV) console.log('🔍 Users count:', users.length);
+      if (import.meta.env.DEV) console.log('🔍 Transactions count:', transactions.length);
 
       return {
         users,

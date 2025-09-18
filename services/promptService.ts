@@ -61,17 +61,17 @@ class PromptService {
     
     // Return cached prompts if available and not forcing reload
     if (this.promptsCache && !forceReload) {
-      console.log('[PromptService] Returning cached prompts');
+      if (import.meta.env.DEV) console.log('[PromptService] Returning cached prompts');
       return this.promptsCache;
     }
     
     try {
       // Try to load from database first
-      console.log('[PromptService] Loading prompts from database');
+      if (import.meta.env.DEV) console.log('[PromptService] Loading prompts from database');
       const databasePrompts = await promptDatabaseService.getPrompts();
       
       if (databasePrompts.length > 0) {
-        console.log('[PromptService] Loaded prompts from database:', databasePrompts.length);
+        if (import.meta.env.DEV) console.log('[PromptService] Loaded prompts from database:', databasePrompts.length);
         this.promptsCache = databasePrompts;
         return databasePrompts;
       }
@@ -82,7 +82,7 @@ class PromptService {
     // Fallback to localStorage
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
-      console.log('[PromptService] Loading prompts from localStorage');
+      if (import.meta.env.DEV) console.log('[PromptService] Loading prompts from localStorage');
       
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -118,14 +118,14 @@ class PromptService {
     
     // Return cached prompts if available and not forcing reload
     if (this.promptsCache && !forceReload) {
-      console.log('[PromptService] Returning cached prompts (sync)');
+      if (import.meta.env.DEV) console.log('[PromptService] Returning cached prompts (sync)');
       return this.promptsCache;
     }
     
     // Fallback to localStorage only for sync version
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
-      console.log('[PromptService] Loading prompts from localStorage (sync)');
+      if (import.meta.env.DEV) console.log('[PromptService] Loading prompts from localStorage (sync)');
       
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -155,20 +155,20 @@ class PromptService {
   public async getPromptByType(type: 'single' | 'couple' | 'family'): Promise<PromptTemplate | null> {
     try {
       // Try database first
-      console.log(`[PromptService] Attempting to load ${type} prompt from database...`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Attempting to load ${type} prompt from database...`);
       const databasePrompts = await promptDatabaseService.getPromptsByType(type);
-      console.log(`[PromptService] Database returned ${databasePrompts.length} prompts for ${type}`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Database returned ${databasePrompts.length} prompts for ${type}`);
       
       if (databasePrompts.length > 0) {
         const selectedPrompt = databasePrompts.find(p => p.isDefault) || databasePrompts[0];
-        console.log(`[PromptService] Loading ${type} prompt from database - Version: ${selectedPrompt.version}`);
+        if (import.meta.env.DEV) console.log(`[PromptService] Loading ${type} prompt from database - Version: ${selectedPrompt.version}`);
         return selectedPrompt;
       } else {
-        console.warn(`[PromptService] No prompts found in database for type: ${type}`);
+        if (import.meta.env.DEV) console.warn(`[PromptService] No prompts found in database for type: ${type}`);
       }
     } catch (error) {
       console.error(`[PromptService] Database error for ${type} prompt:`, error);
-      console.warn(`[PromptService] Failed to load ${type} prompt from database, using localStorage:`, error);
+      if (import.meta.env.DEV) console.warn(`[PromptService] Failed to load ${type} prompt from database, using localStorage:`, error);
     }
 
     // Fallback to localStorage
@@ -177,7 +177,7 @@ class PromptService {
     const selectedPrompt = typePrompts.find(p => p.isDefault) || typePrompts[0] || null;
     
     if (selectedPrompt) {
-      console.log(`[PromptService] Loading ${type} prompt from localStorage - Version: ${selectedPrompt.version}, Last Modified: ${selectedPrompt.lastModified}`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Loading ${type} prompt from localStorage - Version: ${selectedPrompt.version}, Last Modified: ${selectedPrompt.lastModified}`);
     }
     
     return selectedPrompt;
@@ -190,7 +190,7 @@ class PromptService {
     const selectedPrompt = typePrompts.find(p => p.isDefault) || typePrompts[0] || null;
     
     if (selectedPrompt) {
-      console.log(`[PromptService] Loading ${type} prompt sync - Version: ${selectedPrompt.version}, Last Modified: ${selectedPrompt.lastModified}`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Loading ${type} prompt sync - Version: ${selectedPrompt.version}, Last Modified: ${selectedPrompt.lastModified}`);
     }
     
     return selectedPrompt;
@@ -202,7 +202,7 @@ class PromptService {
   public async savePrompts(prompts: PromptTemplate[]): Promise<void> {
     try {
       // Save to both database and localStorage
-      console.log('[PromptService] Saving prompts to database and localStorage');
+      if (import.meta.env.DEV) console.log('[PromptService] Saving prompts to database and localStorage');
       
       // Save to localStorage first (for immediate fallback)
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(prompts));
@@ -216,14 +216,14 @@ class PromptService {
             console.warn(`Failed to save prompt ${prompt.id} to database:`, error);
           }
         }
-        console.log('[PromptService] Saved prompts to database');
+        if (import.meta.env.DEV) console.log('[PromptService] Saved prompts to database');
       } catch (error) {
         console.warn('[PromptService] Failed to save to database, using localStorage only:', error);
       }
       
       // Clear cache when saving new prompts
       this.promptsCache = null;
-      console.log('[PromptService] Saved prompts and cleared cache');
+      if (import.meta.env.DEV) console.log('[PromptService] Saved prompts and cleared cache');
     } catch (error) {
       console.error('Failed to save prompts:', error);
       throw new Error('Failed to save prompt templates');
@@ -235,7 +235,7 @@ class PromptService {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(prompts));
       // Clear cache when saving new prompts
       this.promptsCache = null;
-      console.log('[PromptService] Saved prompts to localStorage (sync) and cleared cache');
+      if (import.meta.env.DEV) console.log('[PromptService] Saved prompts to localStorage (sync) and cleared cache');
     } catch (error) {
       console.error('Failed to save prompts:', error);
       throw new Error('Failed to save prompt templates');
@@ -249,7 +249,7 @@ class PromptService {
     try {
       // Try database first
       await promptDatabaseService.updatePrompt(updatedPrompt);
-      console.log('[PromptService] Updated prompt in database');
+      if (import.meta.env.DEV) console.log('[PromptService] Updated prompt in database');
       
       // Clear cache to force reload
       this.promptsCache = null;
@@ -280,7 +280,7 @@ class PromptService {
     try {
       // Try database first
       await promptDatabaseService.resetPromptToDefault(promptId);
-      console.log('[PromptService] Reset prompt to default in database');
+      if (import.meta.env.DEV) console.log('[PromptService] Reset prompt to default in database');
       
       // Clear cache to force reload
       this.promptsCache = null;
@@ -322,7 +322,7 @@ class PromptService {
     
     try {
       template = await this.getPromptByType(type);
-      console.log(`[PromptService] Using database template version ${template?.version} for ${type}`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Using database template version ${template?.version} for ${type}`);
     } catch (error) {
       console.warn(`[PromptService] Failed to get template from database, using localStorage:`, error);
       template = this.getPromptByTypeSync(type);
@@ -340,11 +340,11 @@ class PromptService {
       const enhanceSection = customPrompt?.trim() 
         ? `\n\nENHANCE: ${customPrompt}` 
         : '';
-      console.log(`[PromptService] Using {enhanceSection} approach. Custom prompt: "${customPrompt || '(empty)'}" → enhanceSection: "${enhanceSection}"`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Using {enhanceSection} approach. Custom prompt: "${customPrompt || '(empty)'}" → enhanceSection: "${enhanceSection}"`);
       prompt = prompt.replace(/\{enhanceSection\}/g, enhanceSection);
     } else {
       // Fallback for old templates using {customPrompt}
-      console.log(`[PromptService] Using legacy {customPrompt} approach. Custom prompt: "${customPrompt || '(empty)'}"`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Using legacy {customPrompt} approach. Custom prompt: "${customPrompt || '(empty)'}"`);
       prompt = prompt.replace(/\{customPrompt\}/g, customPrompt);
     }
 
@@ -352,8 +352,8 @@ class PromptService {
       prompt = prompt.replace(/\{familyMemberCount\}/g, familyMemberCount.toString());
     }
 
-    console.log(`[PromptService] Using template version ${template.version} for ${type}, modified: ${template.lastModified}`);
-    console.log(`[PromptService] First 150 chars of prompt:`, prompt.substring(0, 150));
+    if (import.meta.env.DEV) console.log(`[PromptService] Using template version ${template.version} for ${type}, modified: ${template.lastModified}`);
+    if (import.meta.env.DEV) console.log(`[PromptService] First 150 chars of prompt:`, prompt.substring(0, 150));
     
     return prompt;
   }
@@ -381,11 +381,11 @@ class PromptService {
       const enhanceSection = customPrompt?.trim() 
         ? `\n\nENHANCE: ${customPrompt}` 
         : '';
-      console.log(`[PromptService] Using {enhanceSection} approach. Custom prompt: "${customPrompt || '(empty)'}" → enhanceSection: "${enhanceSection}"`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Using {enhanceSection} approach. Custom prompt: "${customPrompt || '(empty)'}" → enhanceSection: "${enhanceSection}"`);
       prompt = prompt.replace(/\{enhanceSection\}/g, enhanceSection);
     } else {
       // Fallback for old templates using {customPrompt}
-      console.log(`[PromptService] Using legacy {customPrompt} approach. Custom prompt: "${customPrompt || '(empty)'}"`);
+      if (import.meta.env.DEV) console.log(`[PromptService] Using legacy {customPrompt} approach. Custom prompt: "${customPrompt || '(empty)'}"`);
       prompt = prompt.replace(/\{customPrompt\}/g, customPrompt);
     }
 
@@ -393,7 +393,7 @@ class PromptService {
       prompt = prompt.replace(/\{familyMemberCount\}/g, familyMemberCount.toString());
     }
 
-    console.log(`[PromptService] Using template version ${template.version} for ${type} (sync), modified: ${template.lastModified}`);
+    if (import.meta.env.DEV) console.log(`[PromptService] Using template version ${template.version} for ${type} (sync), modified: ${template.lastModified}`);
     
     return prompt;
   }
@@ -416,7 +416,7 @@ class PromptService {
    */
   public clearCache(): void {
     this.promptsCache = null;
-    console.log('[PromptService] Cache cleared');
+    if (import.meta.env.DEV) console.log('[PromptService] Cache cleared');
   }
 
   /**

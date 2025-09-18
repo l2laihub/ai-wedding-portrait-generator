@@ -98,19 +98,19 @@ class EnhancedPromptService {
    * Initialize the enhanced prompt service
    */
   async initialize(): Promise<void> {
-    console.log('[EnhancedPromptService] Initializing...');
+    if (import.meta.env.DEV) console.log('[EnhancedPromptService] Initializing...');
     
     try {
       // Check if migration is needed
       const migrationNeeded = await this.checkMigrationNeeded();
       
       if (migrationNeeded) {
-        console.log('[EnhancedPromptService] Migration required, running automatic migration...');
+        if (import.meta.env.DEV) console.log('[EnhancedPromptService] Migration required, running automatic migration...');
         await this.runMigration();
       }
       
       this.migrationCompleted = true;
-      console.log('[EnhancedPromptService] Initialization complete');
+      if (import.meta.env.DEV) console.log('[EnhancedPromptService] Initialization complete');
     } catch (error) {
       console.error('[EnhancedPromptService] Initialization failed:', error);
       // Continue with legacy mode

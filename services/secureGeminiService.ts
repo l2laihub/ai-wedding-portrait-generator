@@ -243,7 +243,7 @@ class SecureGeminiService {
       // Handle 500 Internal Server Errors with retry logic
       if (lowerErrorMessage.includes('internal') || lowerErrorMessage.includes('500')) {
         if (retryCount < this.maxRetries) {
-          console.log(`Retrying due to server error (attempt ${retryCount + 1}/${this.maxRetries})`)
+          if (process.env.NODE_ENV === 'development') console.log(`Retrying due to server error (attempt ${retryCount + 1}/${this.maxRetries})`)
           // Wait briefly before retry (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000))
           return this.generatePortrait({ ...options, retryCount: retryCount + 1 })
@@ -258,7 +258,7 @@ class SecureGeminiService {
       // Network/connection issues
       if (lowerErrorMessage.includes('network') || lowerErrorMessage.includes('timeout') || lowerErrorMessage.includes('fetch')) {
         if (retryCount < this.maxRetries) {
-          console.log(`Retrying due to network issue (attempt ${retryCount + 1}/${this.maxRetries})`)
+          if (process.env.NODE_ENV === 'development') console.log(`Retrying due to network issue (attempt ${retryCount + 1}/${this.maxRetries})`)
           await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
           return this.generatePortrait({ ...options, retryCount: retryCount + 1 })
         } else {
@@ -304,7 +304,7 @@ class SecureGeminiService {
           customPrompt,
           familyMemberCount
         );
-        console.log(`[PromptService] Generated prompt for ${photoType} ${style} from database:`, generatedPrompt.substring(0, 100) + '...');
+        if (import.meta.env.DEV) console.log(`[PromptService] Generated prompt for ${photoType} ${style} from database:`, generatedPrompt.substring(0, 100) + '...');
         return generatedPrompt;
       } catch (error) {
         console.warn('Failed to generate prompt from database, trying localStorage:', error);
@@ -317,7 +317,7 @@ class SecureGeminiService {
             customPrompt,
             familyMemberCount
           );
-          console.log(`[PromptService] Generated prompt for ${photoType} ${style} from localStorage:`, generatedPrompt.substring(0, 100) + '...');
+          if (import.meta.env.DEV) console.log(`[PromptService] Generated prompt for ${photoType} ${style} from localStorage:`, generatedPrompt.substring(0, 100) + '...');
           return generatedPrompt;
         } catch (syncError) {
           console.warn('Failed to generate prompt from localStorage, using hardcoded fallback:', syncError);
@@ -338,17 +338,19 @@ class SecureGeminiService {
     const generateStylePortrait = async (style: string) => {
       const prompt = await generatePrompt(style)
       
-      // Debug logging for final prompt
-      console.log(`\n🎯 [FINAL PROMPT DEBUG] Style: ${style}`);
-      console.log(`📝 Photo Type: ${photoType}`);
-      console.log(`💬 Custom Prompt: "${customPrompt || '(empty)'}"`);
-      if (photoType === 'family') {
-        console.log(`👨‍👩‍👧‍👦 Family Members: ${familyMemberCount}`);
+      // Debug logging for final prompt (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`\n🎯 [FINAL PROMPT DEBUG] Style: ${style}`);
+        console.log(`📝 Photo Type: ${photoType}`);
+        console.log(`💬 Custom Prompt: "${customPrompt || '(empty)'}"`);
+        if (photoType === 'family') {
+          console.log(`👨‍👩‍👧‍👦 Family Members: ${familyMemberCount}`);
+        }
+        console.log(`📄 Full Prompt (${prompt.length} chars):`);
+        console.log('=====================================');
+        console.log(prompt);
+        console.log('=====================================\n');
       }
-      console.log(`📄 Full Prompt (${prompt.length} chars):`);
-      console.log('=====================================');
-      console.log(prompt);
-      console.log('=====================================\n');
       
       try {
         // Notify that generation is starting

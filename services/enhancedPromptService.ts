@@ -71,7 +71,7 @@ class EnhancedPromptService {
                    this.promptBuilder.resolveTheme(style);
       }
 
-      console.log(`[EnhancedPromptService] Using template engine for ${type} with theme:`, themeObj?.name);
+      if (import.meta.env.DEV) console.log(`[EnhancedPromptService] Using template engine for ${type} with theme:`, themeObj?.name);
 
       // Build enhanced prompt using template engine
       const enhancedPrompt = this.promptBuilder.buildPrompt({
