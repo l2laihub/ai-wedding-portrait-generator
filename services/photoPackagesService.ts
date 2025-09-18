@@ -692,6 +692,296 @@ export class PhotoPackagesService {
   }
 
   // ==========================================
+  // CRUD OPERATIONS FOR ADMIN
+  // ==========================================
+
+  /**
+   * Create a new package
+   */
+  static async createPackage(packageData: Partial<Package>): Promise<Package> {
+    const { data, error } = await supabase
+      .from('photo_packages')
+      .insert({
+        slug: packageData.name?.toLowerCase().replace(/\s+/g, '-') || '',
+        name: packageData.name,
+        description: packageData.description,
+        category: packageData.category || 'wedding',
+        images_per_generation: packageData.images_per_generation || 3,
+        base_prompt_template: packageData.base_prompt_template || '',
+        generation_instructions: packageData.generation_instructions || {},
+        is_active: packageData.is_active !== undefined ? packageData.is_active : true,
+        is_featured: packageData.is_featured !== undefined ? packageData.is_featured : false,
+        sort_order: packageData.sort_order || 0,
+        settings: packageData.settings || {},
+        metadata: packageData.metadata || {}
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating package:', error);
+      throw new Error('Failed to create package');
+    }
+
+    return {
+      ...data,
+      featured: data.is_featured,
+      tags: data.metadata?.tags || []
+    };
+  }
+
+  /**
+   * Update an existing package
+   */
+  static async updatePackage(packageId: string, packageData: Partial<Package>): Promise<Package> {
+    const updateData: any = {};
+    
+    if (packageData.name) updateData.name = packageData.name;
+    if (packageData.description !== undefined) updateData.description = packageData.description;
+    if (packageData.category) updateData.category = packageData.category;
+    if (packageData.images_per_generation) updateData.images_per_generation = packageData.images_per_generation;
+    if (packageData.base_prompt_template !== undefined) updateData.base_prompt_template = packageData.base_prompt_template;
+    if (packageData.generation_instructions) updateData.generation_instructions = packageData.generation_instructions;
+    if (packageData.is_active !== undefined) updateData.is_active = packageData.is_active;
+    if (packageData.is_featured !== undefined) updateData.is_featured = packageData.is_featured;
+    if (packageData.sort_order !== undefined) updateData.sort_order = packageData.sort_order;
+    if (packageData.settings) updateData.settings = packageData.settings;
+    if (packageData.metadata) updateData.metadata = packageData.metadata;
+
+    // Update slug if name changed
+    if (packageData.name) {
+      updateData.slug = packageData.name.toLowerCase().replace(/\s+/g, '-');
+    }
+
+    const { data, error } = await supabase
+      .from('photo_packages')
+      .update(updateData)
+      .eq('id', packageId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating package:', error);
+      throw new Error('Failed to update package');
+    }
+
+    return {
+      ...data,
+      featured: data.is_featured,
+      tags: data.metadata?.tags || []
+    };
+  }
+
+  /**
+   * Delete a package
+   */
+  static async deletePackage(packageId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('photo_packages')
+      .delete()
+      .eq('id', packageId);
+
+    if (error) {
+      console.error('Error deleting package:', error);
+      throw new Error('Failed to delete package');
+    }
+
+    return true;
+  }
+
+  /**
+   * Create a new package theme
+   */
+  static async createPackageTheme(themeData: Partial<PackageTheme>): Promise<PackageTheme> {
+    const { data, error } = await supabase
+      .from('package_themes')
+      .insert({
+        package_id: themeData.package_id,
+        name: themeData.name,
+        description: themeData.description,
+        setting_prompt: themeData.setting_prompt || '',
+        clothing_prompt: themeData.clothing_prompt,
+        atmosphere_prompt: themeData.atmosphere_prompt,
+        technical_prompt: themeData.technical_prompt,
+        style_modifiers: themeData.style_modifiers || [],
+        color_palette: themeData.color_palette || [],
+        inspiration_references: themeData.inspiration_references || [],
+        is_active: themeData.is_active !== undefined ? themeData.is_active : true,
+        is_premium: themeData.is_premium !== undefined ? themeData.is_premium : false,
+        is_seasonal: themeData.is_seasonal !== undefined ? themeData.is_seasonal : false,
+        season_start: themeData.season_start,
+        season_end: themeData.season_end,
+        sort_order: themeData.sort_order || 0,
+        popularity_score: themeData.popularity_score || 5
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating theme:', error);
+      throw new Error('Failed to create theme');
+    }
+
+    return {
+      ...data,
+      mood_tags: data.style_modifiers || [],
+      premium_only: data.is_premium
+    };
+  }
+
+  /**
+   * Update an existing package theme
+   */
+  static async updatePackageTheme(themeId: string, themeData: Partial<PackageTheme>): Promise<PackageTheme> {
+    const updateData: any = {};
+    
+    if (themeData.name) updateData.name = themeData.name;
+    if (themeData.description !== undefined) updateData.description = themeData.description;
+    if (themeData.setting_prompt !== undefined) updateData.setting_prompt = themeData.setting_prompt;
+    if (themeData.clothing_prompt !== undefined) updateData.clothing_prompt = themeData.clothing_prompt;
+    if (themeData.atmosphere_prompt !== undefined) updateData.atmosphere_prompt = themeData.atmosphere_prompt;
+    if (themeData.technical_prompt !== undefined) updateData.technical_prompt = themeData.technical_prompt;
+    if (themeData.style_modifiers) updateData.style_modifiers = themeData.style_modifiers;
+    if (themeData.color_palette) updateData.color_palette = themeData.color_palette;
+    if (themeData.inspiration_references) updateData.inspiration_references = themeData.inspiration_references;
+    if (themeData.is_active !== undefined) updateData.is_active = themeData.is_active;
+    if (themeData.is_premium !== undefined) updateData.is_premium = themeData.is_premium;
+    if (themeData.is_seasonal !== undefined) updateData.is_seasonal = themeData.is_seasonal;
+    if (themeData.season_start !== undefined) updateData.season_start = themeData.season_start;
+    if (themeData.season_end !== undefined) updateData.season_end = themeData.season_end;
+    if (themeData.sort_order !== undefined) updateData.sort_order = themeData.sort_order;
+    if (themeData.popularity_score !== undefined) updateData.popularity_score = themeData.popularity_score;
+
+    const { data, error } = await supabase
+      .from('package_themes')
+      .update(updateData)
+      .eq('id', themeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating theme:', error);
+      throw new Error('Failed to update theme');
+    }
+
+    return {
+      ...data,
+      mood_tags: data.style_modifiers || [],
+      premium_only: data.is_premium
+    };
+  }
+
+  /**
+   * Delete a package theme
+   */
+  static async deletePackageTheme(themeId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('package_themes')
+      .delete()
+      .eq('id', themeId);
+
+    if (error) {
+      console.error('Error deleting theme:', error);
+      throw new Error('Failed to delete theme');
+    }
+
+    return true;
+  }
+
+  /**
+   * Create a new pricing tier
+   */
+  static async createPricingTier(tierData: Partial<PackagePricingTier>): Promise<PackagePricingTier> {
+    const { data, error } = await supabase
+      .from('package_pricing_tiers')
+      .insert({
+        package_id: tierData.package_id,
+        name: tierData.name || tierData.display_name,
+        shoots_count: tierData.shoots_count || tierData.included_generations || 1,
+        price_cents: tierData.price_cents || tierData.price_amount_cents || 0,
+        original_price_cents: tierData.original_price_cents,
+        badge: tierData.badge,
+        features: tierData.features || [],
+        restrictions: tierData.restrictions || {},
+        sort_order: tierData.sort_order || 0,
+        is_active: tierData.is_active !== undefined ? tierData.is_active : true,
+        is_default: tierData.is_default !== undefined ? tierData.is_default : false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating pricing tier:', error);
+      throw new Error('Failed to create pricing tier');
+    }
+
+    return {
+      ...data,
+      display_name: data.name,
+      price_amount_cents: data.price_cents,
+      currency: 'USD',
+      is_popular: data.badge === 'MOST POPULAR',
+      included_generations: data.shoots_count
+    };
+  }
+
+  /**
+   * Update an existing pricing tier
+   */
+  static async updatePricingTier(tierId: string, tierData: Partial<PackagePricingTier>): Promise<PackagePricingTier> {
+    const updateData: any = {};
+    
+    if (tierData.name || tierData.display_name) updateData.name = tierData.name || tierData.display_name;
+    if (tierData.shoots_count || tierData.included_generations) updateData.shoots_count = tierData.shoots_count || tierData.included_generations;
+    if (tierData.price_cents !== undefined || tierData.price_amount_cents !== undefined) updateData.price_cents = tierData.price_cents || tierData.price_amount_cents;
+    if (tierData.original_price_cents !== undefined) updateData.original_price_cents = tierData.original_price_cents;
+    if (tierData.badge !== undefined) updateData.badge = tierData.badge;
+    if (tierData.features) updateData.features = tierData.features;
+    if (tierData.restrictions) updateData.restrictions = tierData.restrictions;
+    if (tierData.sort_order !== undefined) updateData.sort_order = tierData.sort_order;
+    if (tierData.is_active !== undefined) updateData.is_active = tierData.is_active;
+    if (tierData.is_default !== undefined) updateData.is_default = tierData.is_default;
+
+    const { data, error } = await supabase
+      .from('package_pricing_tiers')
+      .update(updateData)
+      .eq('id', tierId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating pricing tier:', error);
+      throw new Error('Failed to update pricing tier');
+    }
+
+    return {
+      ...data,
+      display_name: data.name,
+      price_amount_cents: data.price_cents,
+      currency: 'USD',
+      is_popular: data.badge === 'MOST POPULAR',
+      included_generations: data.shoots_count
+    };
+  }
+
+  /**
+   * Delete a pricing tier
+   */
+  static async deletePricingTier(tierId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('package_pricing_tiers')
+      .delete()
+      .eq('id', tierId);
+
+    if (error) {
+      console.error('Error deleting pricing tier:', error);
+      throw new Error('Failed to delete pricing tier');
+    }
+
+    return true;
+  }
+
+  // ==========================================
   // UTILITY METHODS
   // ==========================================
 

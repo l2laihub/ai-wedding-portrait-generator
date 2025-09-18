@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PhotoPackagesService, Package, PackageTheme, PackagePricingTier } from '../../services/photoPackagesService';
+import { PhotoPackagesService, Package, PackageTheme, PackagePricingTier } from '../../../services/photoPackagesService';
 import LoadingSpinner from '../../components/admin/LoadingSpinner';
 import AlertNotification from '../../components/admin/AlertNotification';
 
@@ -20,6 +20,8 @@ export default function PackageManagement({ className = '' }: PackageManagementP
   const [editingPackage, setEditingPackage] = useState<Partial<Package>>({});
   const [isEditingTheme, setIsEditingTheme] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Partial<PackageTheme>>({});
+  const [isEditingPricingTier, setIsEditingPricingTier] = useState(false);
+  const [editingPricingTier, setEditingPricingTier] = useState<Partial<PackagePricingTier>>({});
 
   // Load initial data
   useEffect(() => {
@@ -61,18 +63,144 @@ export default function PackageManagement({ className = '' }: PackageManagementP
 
   const handlePackageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Note: Package creation/editing would require admin API endpoints
-    setSuccess('Package update feature requires backend implementation');
-    setIsEditingPackage(false);
-    setEditingPackage({});
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (editingPackage.id) {
+        // Update existing package
+        const updatedPackage = await PhotoPackagesService.updatePackage(editingPackage.id, editingPackage);
+        setPackages(packages.map(pkg => pkg.id === updatedPackage.id ? updatedPackage : pkg));
+        setSelectedPackage(updatedPackage);
+        setSuccess('Package updated successfully');
+      } else {
+        // Create new package
+        const newPackage = await PhotoPackagesService.createPackage(editingPackage);
+        setPackages([newPackage, ...packages]);
+        setSuccess('Package created successfully');
+      }
+      
+      setIsEditingPackage(false);
+      setEditingPackage({});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save package');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleThemeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Note: Theme creation/editing would require admin API endpoints
-    setSuccess('Theme update feature requires backend implementation');
-    setIsEditingTheme(false);
-    setEditingTheme({});
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (editingTheme.id) {
+        // Update existing theme
+        const updatedTheme = await PhotoPackagesService.updatePackageTheme(editingTheme.id, editingTheme);
+        setPackageThemes(packageThemes.map(theme => theme.id === updatedTheme.id ? updatedTheme : theme));
+        setSuccess('Theme updated successfully');
+      } else {
+        // Create new theme
+        const newTheme = await PhotoPackagesService.createPackageTheme(editingTheme);
+        setPackageThemes([...packageThemes, newTheme]);
+        setSuccess('Theme created successfully');
+      }
+      
+      setIsEditingTheme(false);
+      setEditingTheme({});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save theme');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePricingTierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (editingPricingTier.id) {
+        // Update existing pricing tier
+        const updatedTier = await PhotoPackagesService.updatePricingTier(editingPricingTier.id, editingPricingTier);
+        setPricingTiers(pricingTiers.map(tier => tier.id === updatedTier.id ? updatedTier : tier));
+        setSuccess('Pricing tier updated successfully');
+      } else {
+        // Create new pricing tier
+        const newTier = await PhotoPackagesService.createPricingTier(editingPricingTier);
+        setPricingTiers([...pricingTiers, newTier]);
+        setSuccess('Pricing tier created successfully');
+      }
+      
+      setIsEditingPricingTier(false);
+      setEditingPricingTier({});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save pricing tier');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePackage = async (packageId: string) => {
+    if (!confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await PhotoPackagesService.deletePackage(packageId);
+      setPackages(packages.filter(pkg => pkg.id !== packageId));
+      if (selectedPackage?.id === packageId) {
+        setSelectedPackage(null);
+      }
+      setSuccess('Package deleted successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete package');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTheme = async (themeId: string) => {
+    if (!confirm('Are you sure you want to delete this theme? This action cannot be undone.')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await PhotoPackagesService.deletePackageTheme(themeId);
+      setPackageThemes(packageThemes.filter(theme => theme.id !== themeId));
+      setSuccess('Theme deleted successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete theme');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePricingTier = async (tierId: string) => {
+    if (!confirm('Are you sure you want to delete this pricing tier? This action cannot be undone.')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await PhotoPackagesService.deletePricingTier(tierId);
+      setPricingTiers(pricingTiers.filter(tier => tier.id !== tierId));
+      setSuccess('Pricing tier deleted successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete pricing tier');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatPrice = (priceCents: number, currency: string = 'USD') => {
@@ -190,15 +318,23 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                     <h3 className="font-semibold text-gray-900 dark:text-white">
                       {selectedPackage.name}
                     </h3>
-                    <button
-                      onClick={() => {
-                        setEditingPackage(selectedPackage);
-                        setIsEditingPackage(true);
-                      }}
-                      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingPackage(selectedPackage);
+                          setIsEditingPackage(true);
+                        }}
+                        className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeletePackage(selectedPackage.id)}
+                        className="px-3 py-1 text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="p-4">
@@ -312,15 +448,23 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                                 }`}>
                                   {theme.is_active ? 'Active' : 'Inactive'}
                                 </span>
-                                <button
-                                  onClick={() => {
-                                    setEditingTheme(theme);
-                                    setIsEditingTheme(true);
-                                  }}
-                                  className="text-blue-600 hover:text-blue-700 text-sm"
-                                >
-                                  Edit
-                                </button>
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingTheme(theme);
+                                      setIsEditingTheme(true);
+                                    }}
+                                    className="text-blue-600 hover:text-blue-700 text-sm"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTheme(theme.id)}
+                                    className="text-red-600 hover:text-red-700 text-sm"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -335,7 +479,23 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                         <h4 className="font-medium text-gray-900 dark:text-white">
                           Pricing Tiers
                         </h4>
-                        <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                        <button
+                          onClick={() => {
+                            setEditingPricingTier({
+                              package_id: selectedPackage.id,
+                              name: '',
+                              shoots_count: 1,
+                              price_cents: 0,
+                              features: [],
+                              restrictions: {},
+                              sort_order: pricingTiers.length,
+                              is_active: true,
+                              is_default: false
+                            });
+                            setIsEditingPricingTier(true);
+                          }}
+                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                        >
                           Add Tier
                         </button>
                       </div>
@@ -373,9 +533,23 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                                 }`}>
                                   {tier.is_active ? 'Active' : 'Inactive'}
                                 </span>
-                                <button className="text-blue-600 hover:text-blue-700 text-sm">
-                                  Edit
-                                </button>
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingPricingTier(tier);
+                                      setIsEditingPricingTier(true);
+                                    }}
+                                    className="text-blue-600 hover:text-blue-700 text-sm"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePricingTier(tier.id)}
+                                    className="text-red-600 hover:text-red-700 text-sm"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -665,6 +839,171 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   {editingTheme.id ? 'Update' : 'Create'} Theme
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing Tier Edit Modal */}
+      {isEditingPricingTier && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handlePricingTierSubmit}>
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {editingPricingTier.id ? 'Edit Pricing Tier' : 'Create New Pricing Tier'}
+                </h3>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Tier Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPricingTier.name || editingPricingTier.display_name || ''}
+                    onChange={(e) => setEditingPricingTier({ ...editingPricingTier, name: e.target.value, display_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    required
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Price (cents)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingPricingTier.price_cents || editingPricingTier.price_amount_cents || 0}
+                      onChange={(e) => setEditingPricingTier({ 
+                        ...editingPricingTier, 
+                        price_cents: parseInt(e.target.value),
+                        price_amount_cents: parseInt(e.target.value)
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Included Generations
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editingPricingTier.shoots_count || editingPricingTier.included_generations || 1}
+                      onChange={(e) => setEditingPricingTier({ 
+                        ...editingPricingTier, 
+                        shoots_count: parseInt(e.target.value),
+                        included_generations: parseInt(e.target.value)
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Badge (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPricingTier.badge || ''}
+                    onChange={(e) => setEditingPricingTier({ ...editingPricingTier, badge: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="e.g., MOST POPULAR, BEST VALUE"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Features (one per line)
+                  </label>
+                  <textarea
+                    value={editingPricingTier.features?.join('\n') || ''}
+                    onChange={(e) => setEditingPricingTier({ 
+                      ...editingPricingTier, 
+                      features: e.target.value.split('\n').filter(f => f.trim())
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    rows={4}
+                    placeholder="High-resolution images&#10;Multiple style options&#10;Commercial usage rights"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Sort Order
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingPricingTier.sort_order || 0}
+                      onChange={(e) => setEditingPricingTier({ ...editingPricingTier, sort_order: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Original Price (cents, optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingPricingTier.original_price_cents || ''}
+                      onChange={(e) => setEditingPricingTier({ ...editingPricingTier, original_price_cents: e.target.value ? parseInt(e.target.value) : undefined })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="For showing discounts"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPricingTier.is_active !== undefined ? editingPricingTier.is_active : true}
+                      onChange={(e) => setEditingPricingTier({ ...editingPricingTier, is_active: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Active</span>
+                  </label>
+                  
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPricingTier.is_default || false}
+                      onChange={(e) => setEditingPricingTier({ ...editingPricingTier, is_default: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Default Tier</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingPricingTier(false);
+                    setEditingPricingTier({});
+                  }}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  {editingPricingTier.id ? 'Update' : 'Create'} Pricing Tier
                 </button>
               </div>
             </form>
