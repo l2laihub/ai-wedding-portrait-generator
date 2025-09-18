@@ -81,3 +81,6 @@ Uses Tailwind CSS classes throughout with a dark theme (bg-gray-900 base).
 - No linting or type checking scripts are defined in package.json
 - The project uses modern React 19 with function components and hooks
 - Vite provides fast development server and build tooling
+
+## Security Memories
+- Add to `.gitignore` and remove all test scripts that contain credentials, API keys, or secrets to prevent accidental exposure
