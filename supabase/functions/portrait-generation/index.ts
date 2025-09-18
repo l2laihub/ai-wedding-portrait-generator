@@ -251,27 +251,33 @@ serve(async (req) => {
       )
     }
 
-    // Validate API key if provided (for service-to-service calls)
+    // Validate API key if provided
     if (apiKey) {
-      try {
-        const keyValidation = await validateApiKey(apiKey)
-        if (!keyValidation.valid) {
+      if (apiKey.startsWith('sb_publishable_')) {
+        // This is an anon key from frontend - no validation needed
+        console.log('Anonymous user request with publishable key')
+      } else {
+        // This might be a service-to-service API key - validate it
+        try {
+          const keyValidation = await validateApiKey(apiKey)
+          if (!keyValidation.valid) {
+            return new Response(
+              JSON.stringify({ error: 'Invalid API key' }),
+              { 
+                status: 401, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              }
+            )
+          }
+        } catch (error) {
           return new Response(
-            JSON.stringify({ error: 'Invalid API key' }),
+            JSON.stringify({ error: 'API key validation failed' }),
             { 
               status: 401, 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
             }
           )
         }
-      } catch (error) {
-        return new Response(
-          JSON.stringify({ error: 'API key validation failed' }),
-          { 
-            status: 401, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
       }
     }
 
@@ -279,11 +285,21 @@ serve(async (req) => {
     let authenticatedUserId: string | null = null
     const authHeader = req.headers.get('authorization')
     if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
-        authenticatedUserId = user?.id || null
-      } catch (error) {
-        console.warn('Failed to get user from token:', error)
+      const token = authHeader.replace('Bearer ', '')
+      // Only try to validate if it looks like a JWT (contains dots), not an anon key
+      if (token.includes('.') && !token.startsWith('sb_')) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser(token)
+          authenticatedUserId = user?.id || null
+        } catch (error) {
+          console.warn('Failed to get user from token:', error)
+        }
+      } else if (token.startsWith('sb_publishable_')) {
+        // This is an anon key - anonymous user, no authentication needed
+        console.log('Anonymous user with publishable key')
+      } else {
+        // Unknown token format
+        console.warn('Unknown authorization token format:', token.substring(0, 20) + '...')
       }
     }
 

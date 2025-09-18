@@ -39,8 +39,20 @@ dist-ssr
 *test*.js
 *DEBUG*.js
 *debug*.js
+*validate*.js
+test-*.js
+debug-*.js
+validate-*.js
 EDGE_FUNCTION_API_TEST_REPORT.md
 RATE_LIMIT_TESTING_README.md
+
+# API Keys and sensitive tokens
+*api*key*
+*secret*key*
+*stripe*key*
+*.token
+*credentials*.json
+*config*.json
 
 # Supabase Edge Function environment files
 supabase/functions/.env

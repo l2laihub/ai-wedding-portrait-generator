@@ -73,10 +73,26 @@ class SecureGeminiService {
     const { data: { session } } = await supabase.auth.getSession()
     
     if (session?.access_token) {
+      // Authenticated user - use JWT token
       headers['Authorization'] = `Bearer ${session.access_token}`
     }
+    // For anonymous users, don't set Authorization header - use apiKey in body instead
 
     return headers
+  }
+
+  /**
+   * Get API key for request body (for anonymous users)
+   */
+  private async getApiKeyForBody(): Promise<string | undefined> {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
+      // Anonymous user - return anon key for request body
+      return import.meta.env.VITE_SUPABASE_ANON_KEY
+    }
+    
+    return undefined
   }
 
   /**
@@ -84,11 +100,15 @@ class SecureGeminiService {
    */
   private async callBackendAPI(requestData: any): Promise<GenerationResult> {
     const headers = await this.getAuthHeaders()
+    const apiKey = await this.getApiKeyForBody()
+    
+    // Add apiKey to request data if available (for anonymous users)
+    const finalRequestData = apiKey ? { ...requestData, apiKey } : requestData
     
     const response = await fetch(this.edgeFunctionUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(requestData)
+      body: JSON.stringify(finalRequestData)
     })
 
     const responseData = await response.json()
