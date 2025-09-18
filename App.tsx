@@ -184,6 +184,8 @@ function App({ navigate }: AppProps) {
 
   // Enhanced generation handler with theme support
   const handleEnhancedGenerate = async (selectedThemeIds?: string[]) => {
+    console.log('🚀 handleEnhancedGenerate called');
+    
     if (!sourceImageFile) {
       setError("Please upload an image first.");
       return;
@@ -192,6 +194,36 @@ function App({ navigate }: AppProps) {
     if (!isOnline) {
       setError("Please check your internet connection and try again.");
       return;
+    }
+
+    // IMMEDIATE rate limit check for anonymous users - before any async operations
+    if (!user) {
+      console.log('🔒 Anonymous user - checking enhanced generation rate limits immediately');
+      
+      // Force fresh check
+      const wasReset = rateLimiter.checkAndAutoReset();
+      if (wasReset) {
+        console.log('✅ Enhanced generation - Daily limit was auto-reset due to new day');
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: rateLimiter.DISPLAY_LIMIT }
+        }));
+      }
+      
+      // Strict blocking check - absolutely no API calls if at limit
+      if (rateLimiter.isStrictlyAtLimit()) {
+        console.error('🚫 BLOCKED: Enhanced generation blocked for anonymous user at daily limit');
+        setShowLimitModal(true);
+        setError(`Daily limit reached: You've used all 3 free photo shoots today. Come back tomorrow for 3 more!`);
+        
+        // Force UI counter update immediately
+        const currentStats = rateLimiter.getUsageStats();
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: 0 }
+        }));
+        return;
+      }
+      
+      console.log('✅ Enhanced generation anonymous user rate limit check passed');
     }
 
     // Initialize user identification service
@@ -205,18 +237,17 @@ function App({ navigate }: AppProps) {
         return;
       }
     } else {
-      const localLimit = rateLimiter.checkLimit();
-      if (!localLimit.canProceed) {
-        setShowLimitModal(true);
-        setError(`You've used all 3 free photo shoots today (${localLimit.total - localLimit.remaining}/3). Each photo shoot creates 3 images!`);
-        return;
-      }
-      
-      const backendLimit = await secureGeminiService.checkRateLimit();
-      if (!backendLimit.canProceed) {
-        setShowLimitModal(true);
-        setError(`Rate limit reached. Please try again later.`);
-        return;
+      // Also check backend rate limits to ensure consistency for anonymous users
+      try {
+        const backendLimit = await secureGeminiService.checkRateLimit();
+        if (!backendLimit.canProceed) {
+          setShowLimitModal(true);
+          setError(`Server rate limit reached. Please try again later.`);
+          return;
+        }
+      } catch (backendError) {
+        console.warn('Backend rate limit check failed:', backendError);
+        // Continue with local validation only if backend is unavailable
       }
     }
 
@@ -280,9 +311,9 @@ function App({ navigate }: AppProps) {
       });
       
       // Track each theme in database analytics
-      themesToGenerate.forEach(async (theme) => {
-        await databaseService.trackUsage(generationId, photoType, theme.name || theme.style || theme.id);
-      });
+      await Promise.all(themesToGenerate.map(async (theme) => {
+        return databaseService.trackUsage(generationId, photoType, theme.name || theme.style || theme.id);
+      }));
       
       let generationResult;
       
@@ -437,7 +468,14 @@ function App({ navigate }: AppProps) {
           (c.text?.includes('Server temporarily unavailable') || c.text?.includes('internal error'))
         );
         
-        if (hasRateLimitError) {
+        if (successfulStyles.length === 0) {
+          // All styles failed - more specific error message
+          if (hasRateLimitError) {
+            setError(`Generation failed: Daily API limits reached. Please try again tomorrow when limits reset at midnight PT.`);
+          } else {
+            setError(`Generation failed: All portrait styles encountered issues. Please try with a different photo or check your internet connection.`);
+          }
+        } else if (hasRateLimitError) {
           setError(`Some portrait styles hit rate limits, but ${successfulStyles.length} succeeded! 🎆`);
         } else if (hasServerError) {
           setError(`${successfulStyles.length} portraits generated successfully! ${failedStyles.length} styles experienced server issues but you can try regenerating them. 🔄`);
@@ -456,6 +494,8 @@ function App({ navigate }: AppProps) {
   };
 
   const handleGenerate = async () => {
+    console.log('🚀 handleGenerate called');
+    
     if (!sourceImageFile) {
       setError("Please upload an image first.");
       return;
@@ -464,6 +504,36 @@ function App({ navigate }: AppProps) {
     if (!isOnline) {
       setError("Please check your internet connection and try again.");
       return;
+    }
+
+    // IMMEDIATE rate limit check for anonymous users - before any async operations
+    if (!user) {
+      console.log('🔒 Anonymous user - checking rate limits immediately');
+      
+      // Force fresh check
+      const wasReset = rateLimiter.checkAndAutoReset();
+      if (wasReset) {
+        console.log('✅ Daily limit was auto-reset due to new day');
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: rateLimiter.DISPLAY_LIMIT }
+        }));
+      }
+      
+      // Strict blocking check - absolutely no API calls if at limit
+      if (rateLimiter.isStrictlyAtLimit()) {
+        console.error('🚫 BLOCKED: Anonymous user at daily limit');
+        setShowLimitModal(true);
+        setError(`Daily limit reached: You've used all 3 free photo shoots today. Come back tomorrow for 3 more!`);
+        
+        // Force UI counter update immediately
+        const currentStats = rateLimiter.getUsageStats();
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: 0 }
+        }));
+        return;
+      }
+      
+      console.log('✅ Anonymous user rate limit check passed');
     }
 
     // Initialize user identification service
@@ -478,20 +548,17 @@ function App({ navigate }: AppProps) {
         return;
       }
     } else {
-      // For anonymous users, check local rate limiter first
-      const localLimit = rateLimiter.checkLimit();
-      if (!localLimit.canProceed) {
-        setShowLimitModal(true);
-        setError(`You've used all 3 free photo shoots today (${localLimit.total - localLimit.remaining}/3). Each photo shoot creates 3 images!`);
-        return;
-      }
-      
-      // Also check backend rate limits to ensure consistency
-      const backendLimit = await secureGeminiService.checkRateLimit();
-      if (!backendLimit.canProceed) {
-        setShowLimitModal(true);
-        setError(`Rate limit reached. Please try again later.`);
-        return;
+      // Also check backend rate limits to ensure consistency for anonymous users
+      try {
+        const backendLimit = await secureGeminiService.checkRateLimit();
+        if (!backendLimit.canProceed) {
+          setShowLimitModal(true);
+          setError(`Server rate limit reached. Please try again later.`);
+          return;
+        }
+      } catch (backendError) {
+        console.warn('Backend rate limit check failed:', backendError);
+        // Continue with local validation only if backend is unavailable
       }
     }
 
@@ -522,9 +589,9 @@ function App({ navigate }: AppProps) {
       });
       
       // Track each style in database analytics
-      stylesToGenerate.forEach(async (style) => {
-        await databaseService.trackUsage(generationId, photoType, style);
-      });
+      await Promise.all(stylesToGenerate.map(async (style) => {
+        return databaseService.trackUsage(generationId, photoType, style);
+      }));
       
       // Use secure backend for generation
       console.log(`🎨 Generating ${stylesToGenerate.length} styles using secure backend`);
@@ -637,7 +704,14 @@ function App({ navigate }: AppProps) {
           (c.text?.includes('Server temporarily unavailable') || c.text?.includes('internal error'))
         );
         
-        if (hasRateLimitError) {
+        if (successfulStyles.length === 0) {
+          // All styles failed - more specific error message
+          if (hasRateLimitError) {
+            setError(`Generation failed: Daily API limits reached. Please try again tomorrow when limits reset at midnight PT.`);
+          } else {
+            setError(`Generation failed: All portrait styles encountered issues. Please try with a different photo or check your internet connection.`);
+          }
+        } else if (hasRateLimitError) {
           setError(`Some portrait styles hit rate limits, but ${successfulStyles.length} succeeded! 🎆`);
         } else if (hasServerError) {
           setError(`${successfulStyles.length} portraits generated successfully! ${failedStyles.length} styles experienced server issues but you can try regenerating them. 🔄`);

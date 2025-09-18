@@ -94,17 +94,32 @@ class RateLimiter {
     try {
       const stored = localStorage.getItem(this.config.SESSION_KEY);
       if (!stored) {
+        console.log('No stored usage data found, creating fresh data');
         return this.createFreshUsageData();
       }
 
       const data: UsageData = JSON.parse(stored);
       const currentDate = this.getCurrentDateKey();
 
-      // Check if we need to reset for a new day
-      if (data.date !== currentDate) {
+      // Validate data structure
+      if (!data.date || typeof data.used !== 'number' || !data.lastReset) {
+        console.warn('Invalid usage data structure, creating fresh data:', data);
         return this.createFreshUsageData();
       }
 
+      // Check if we need to reset for a new day
+      if (data.date !== currentDate) {
+        console.log('Date changed, creating fresh data. Old:', data.date, 'New:', currentDate);
+        return this.createFreshUsageData();
+      }
+
+      // Validate usage count isn't negative or excessive
+      if (data.used < 0 || data.used > this.config.FREE_DAILY) {
+        console.warn('Invalid usage count, resetting. Usage:', data.used, 'Limit:', this.config.FREE_DAILY);
+        return this.createFreshUsageData();
+      }
+
+      console.log('Using existing usage data:', data);
       return data;
     } catch (error) {
       console.warn('Failed to read usage data from localStorage:', error);
@@ -116,11 +131,18 @@ class RateLimiter {
    * Create fresh usage data for a new day
    */
   private createFreshUsageData(): UsageData {
-    return {
+    const freshData = {
       date: this.getCurrentDateKey(),
       used: 0,
       lastReset: Date.now()
     };
+    
+    console.log('Creating fresh usage data:', freshData);
+    
+    // Immediately save fresh data to localStorage and trigger events
+    this.saveUsageData(freshData);
+    
+    return freshData;
   }
 
   /**
@@ -144,9 +166,20 @@ class RateLimiter {
    * Check if user can proceed with generation and get remaining credits
    */
   public checkLimit(): RateLimitResult {
+    // Force auto-reset check before checking limits
+    this.checkAndAutoReset();
+    
     const usage = this.getUsageData();
     const remaining = Math.max(0, this.config.FREE_DAILY - usage.used);
     const canProceed = remaining > 0;
+
+    console.log('Rate limit check:', {
+      usage: usage.used,
+      remaining,
+      total: this.config.FREE_DAILY,
+      canProceed,
+      date: usage.date
+    });
 
     return {
       canProceed,
@@ -163,13 +196,21 @@ class RateLimiter {
   public consumeCredit(): RateLimitResult {
     const usage = this.getUsageData();
     
+    console.log('consumeCredit called:', {
+      currentUsage: usage.used,
+      limit: this.config.FREE_DAILY,
+      canConsume: usage.used < this.config.FREE_DAILY
+    });
+    
     if (usage.used >= this.config.FREE_DAILY) {
+      console.warn('Attempted to consume credit but already at limit');
       // Already at limit, don't increment
       return this.checkLimit();
     }
 
     // Increment usage
     usage.used += 1;
+    console.log('Credit consumed, new usage:', usage.used);
     this.saveUsageData(usage);
 
     return this.checkLimit();
@@ -202,6 +243,44 @@ class RateLimiter {
   public resetUsage(): void {
     const freshData = this.createFreshUsageData();
     this.saveUsageData(freshData);
+  }
+
+  /**
+   * Force refresh counter (for troubleshooting localStorage issues)
+   */
+  public forceRefresh(): void {
+    const usage = this.getUsageData();
+    // Re-save to trigger events
+    this.saveUsageData(usage);
+  }
+
+  /**
+   * Strict validation - returns true if user definitely CANNOT proceed
+   */
+  public isStrictlyAtLimit(): boolean {
+    const usage = this.getUsageData();
+    const stats = this.getUsageStats();
+    const limit = this.checkLimit();
+    
+    const atLimit = (
+      usage.used >= this.config.FREE_DAILY ||
+      stats.remaining <= 0 ||
+      stats.used >= this.config.FREE_DAILY ||
+      !limit.canProceed ||
+      limit.remaining <= 0
+    );
+    
+    console.log('Strict limit check:', {
+      usage: usage.used,
+      limit: this.config.FREE_DAILY,
+      statsRemaining: stats.remaining,
+      statsUsed: stats.used,
+      canProceed: limit.canProceed,
+      limitRemaining: limit.remaining,
+      atLimit
+    });
+    
+    return atLimit;
   }
 
   /**

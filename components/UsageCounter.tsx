@@ -31,7 +31,13 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
         setTimeUntilReset(creditsService.getTimeUntilReset());
       }
     } else {
-      // For anonymous users, use rate limiter
+      // For anonymous users, force a fresh check and auto-reset if needed
+      const wasReset = rateLimiter.checkAndAutoReset();
+      if (wasReset) {
+        console.log('UsageCounter: Daily limit was auto-reset due to new day');
+      }
+      
+      // Get fresh rate limiter data
       const info = rateLimiter.checkLimit();
       console.log('UsageCounter: Rate limiter info updated:', info);
       setLimitInfo(info);
@@ -44,16 +50,22 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
   };
 
   useEffect(() => {
-    // Initial load
+    // Initial load with small delay to ensure data is fresh
     updateUsageInfo();
+    
+    // For anonymous users, do an immediate second check to handle localStorage inconsistencies
+    if (!user) {
+      setTimeout(updateUsageInfo, 50);
+    }
 
     // Update every minute to keep time until reset accurate
     const interval = setInterval(updateUsageInfo, 60000);
 
-    // Listen for storage changes (in case user opens multiple tabs) - only for anonymous users
+    // Listen for storage changes (in case user opens multiple tabs or clears localStorage) - only for anonymous users
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'wedai_usage' && !user) {
-        updateUsageInfo();
+      if ((e.key === 'wedai_usage' || e.key === null) && !user) {
+        console.log('UsageCounter: Storage change detected, forcing refresh', { key: e.key });
+        setTimeout(updateUsageInfo, 100); // Small delay to ensure localStorage changes are propagated
       }
     };
 
@@ -80,11 +92,30 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
   const isAuthenticated = !!user;
   const displayLimit = 3; // Show 3 daily portraits for anonymous users
   
-  const remaining = isAuthenticated ? creditBalance?.totalAvailable || 0 : Math.min(limitInfo?.remaining || 0, displayLimit);
-  const total = isAuthenticated ? creditBalance?.totalAvailable || 0 : displayLimit;
-  const used = isAuthenticated ? 
-    (creditBalance?.freeCreditsUsed || 0) : 
-    Math.min((limitInfo?.total || 0) - (limitInfo?.remaining || 0), displayLimit);
+  // For anonymous users, ensure we show accurate remaining count
+  let remaining: number;
+  let total: number;
+  let used: number;
+  
+  if (isAuthenticated) {
+    remaining = creditBalance?.totalAvailable || 0;
+    total = creditBalance?.totalAvailable || 0;
+    used = creditBalance?.freeCreditsUsed || 0;
+  } else {
+    // Force fresh check for anonymous users to handle localStorage clearing
+    const freshStats = rateLimiter.getUsageStats();
+    remaining = Math.max(0, Math.min(freshStats.remaining, displayLimit));
+    total = displayLimit;
+    used = Math.min(freshStats.used, displayLimit);
+    
+    console.log('UsageCounter display values:', {
+      freshStats,
+      remaining,
+      total,
+      used,
+      limitInfo
+    });
+  }
 
   const getStatusColor = () => {
     if (remaining === 0) return 'text-red-600 dark:text-red-400';
@@ -119,7 +150,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
               '0 photo shoots remaining'
             )
           ) : (
-            `${remaining}/${displayLimit} photo shoots today (${remaining * 3} images)`
+            `${remaining}/${displayLimit} free photo shoots available (${remaining * 3} images)`
           )}
         </span>
         {showTimeUntilReset && remaining === 0 && (
@@ -140,7 +171,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
             className={`w-5 h-5 ${getStatusColor()}`} 
           />
           <h3 className="font-medium text-gray-900 dark:text-white">
-            {isAuthenticated ? 'Photo Shoots Balance' : 'Daily Photo Shoots'}
+            {isAuthenticated ? 'Photo Shoots Balance' : 'Free Daily Credits'}
           </h3>
         </div>
         <span className={`text-lg font-bold ${getStatusColor()}`}>
@@ -186,14 +217,14 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
             </span>
           )
         ) : (
-          limitInfo?.remaining && limitInfo.remaining > 0 ? (
+          remaining > 0 ? (
             <span>
-              You have <strong className={getStatusColor()}>{limitInfo.remaining}</strong> free photo shoot{limitInfo.remaining !== 1 ? 's' : ''} remaining today 
-              <strong className="text-blue-600 dark:text-blue-400"> ({limitInfo.remaining * 3} images!)</strong>
+              You have <strong className={getStatusColor()}>{remaining}</strong> free photo shoot{remaining !== 1 ? 's' : ''} available today 
+              <strong className="text-blue-600 dark:text-blue-400"> (create {remaining * 3} portrait{remaining * 3 !== 1 ? 's' : ''}!)</strong>
             </span>
           ) : (
             <span>
-              You've used today's 3 free photo shoots (9 images)! 
+              You've used all 3 free photo shoots today (created 9 portraits)! 
               {showTimeUntilReset && (
                 <span className="ml-1">
                   Resets in <strong>{timeUntilReset}</strong>.
