@@ -35,6 +35,8 @@ import {
 import EnhancedPromptInput from './components/EnhancedPromptInput';
 import EnhancedImageDisplay from './components/EnhancedImageDisplay';
 import EnhancedComponentErrorBoundary from './components/EnhancedComponentErrorBoundary';
+import PackageSelector from './components/PackageSelector';
+import { PhotoPackagesService, Package, PackageTheme, PackagePricingTier } from './services/photoPackagesService';
 import { editImageWithNanoBanana } from './services/geminiService';
 import { secureGeminiService, userIdentificationService } from './services';
 // Enhanced services - with fallback handling
@@ -158,6 +160,12 @@ function App({ navigate }: AppProps) {
   const [migrationStatus, setMigrationStatus] = useState<any>(null);
   const [enhancedSecureGeminiService, setEnhancedSecureGeminiService] = useState<any>(null);
   
+  // Package selection state
+  const [showPackageSelector, setShowPackageSelector] = useState<boolean>(false);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [selectedPricingTier, setSelectedPricingTier] = useState<PackagePricingTier | null>(null);
+  const [selectedPackageThemes, setSelectedPackageThemes] = useState<PackageTheme[]>([]);
+  
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
   const { theme } = useTheme();
@@ -180,6 +188,55 @@ function App({ navigate }: AppProps) {
     if (newPrompt.length > 0) {
       posthogService.trackPromptModified(newPrompt);
     }
+  };
+
+  // Handle package selection from PackageSelector
+  const handlePackageSelected = (packageData: {
+    package: Package;
+    selectedTier: PackagePricingTier;
+    selectedThemes: PackageTheme[];
+  }) => {
+    setSelectedPackage(packageData.package);
+    setSelectedPricingTier(packageData.selectedTier);
+    setSelectedPackageThemes(packageData.selectedThemes);
+    setShowPackageSelector(false);
+    
+    // Auto-start generation with selected package
+    handlePackageGenerate(packageData);
+  };
+
+  // Package-based generation handler
+  const handlePackageGenerate = async (packageData?: {
+    package: Package;
+    selectedTier: PackagePricingTier;
+    selectedThemes: PackageTheme[];
+  }) => {
+    const packageToUse = packageData || {
+      package: selectedPackage!,
+      selectedTier: selectedPricingTier!,
+      selectedThemes: selectedPackageThemes
+    };
+
+    if (!sourceImageFile) {
+      setError("Please upload an image first.");
+      return;
+    }
+
+    if (!isOnline) {
+      setError("Please check your internet connection and try again.");
+      return;
+    }
+
+    // Use package themes instead of legacy themes
+    const themesToGenerate = packageToUse.selectedThemes.length > 0 
+      ? packageToUse.selectedThemes 
+      : await PhotoPackagesService.getPackageThemes(packageToUse.package.id);
+
+    // Convert package themes to the format expected by enhanced generation
+    const themeIds = themesToGenerate.map(theme => theme.id);
+    
+    // Call enhanced generation with package themes
+    await handleEnhancedGenerate(themeIds);
   };
 
   // Enhanced generation handler with theme support
@@ -1190,7 +1247,30 @@ function App({ navigate }: AppProps) {
             sourceImageUrl={sourceImageUrl} 
           />
 
-          {sourceImageUrl && (
+          {sourceImageUrl && !showPackageSelector && (
+            <div className="flex flex-col items-center space-y-4">
+              <button
+                onClick={() => setShowPackageSelector(true)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                🎨 Choose Photo Package
+              </button>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                Or scroll down to use the quick generation mode
+              </p>
+            </div>
+          )}
+
+          {showPackageSelector && sourceImageUrl && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+              <PackageSelector
+                onPackageSelected={handlePackageSelected}
+                isLoading={isLoading}
+              />
+            </div>
+          )}
+
+          {sourceImageUrl && !showPackageSelector && (
             <div>
               
               {/* Use Enhanced or Legacy Prompt Input */}

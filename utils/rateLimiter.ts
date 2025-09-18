@@ -1,8 +1,10 @@
 /**
  * Rate Limiter for Wedding Portrait Generator
  * Implements daily limits with localStorage persistence and midnight reset
- * Enhanced with authentication rate limiting
+ * Enhanced with authentication rate limiting and package integration
  */
+
+import { PhotoPackagesService, type RateLimitCheck } from '../services/photoPackagesService';
 
 export interface RateLimitConfig {
   FREE_DAILY: number;
@@ -38,6 +40,11 @@ export interface RateLimitResult {
   total: number;
   resetsAt: Date;
   isAtLimit: boolean;
+}
+
+export interface PackageRateLimitResult extends RateLimitResult {
+  packageLimitCheck?: RateLimitCheck;
+  userType?: 'anonymous' | 'free' | 'paid' | 'premium';
 }
 
 class RateLimiter {
@@ -648,6 +655,190 @@ class RateLimiter {
     } catch (error) {
       console.warn('Failed to cleanup auth data:', error);
     }
+  }
+
+  /**
+   * Package-aware rate limiting
+   */
+  
+  /**
+   * Check package-specific rate limits
+   */
+  public async checkPackageLimit(
+    userIdentifier: string,
+    packageId: string,
+    userType: 'anonymous' | 'free' | 'paid' | 'premium' = 'anonymous'
+  ): Promise<PackageRateLimitResult> {
+    try {
+      // First check traditional rate limits
+      const traditionalLimit = this.checkLimit();
+      
+      // Then check package-specific limits
+      const packageLimitCheck = await PhotoPackagesService.checkPackageRateLimit(
+        userIdentifier,
+        packageId,
+        userType
+      );
+
+      // Combine the results - both must pass
+      const canProceed = traditionalLimit.canProceed && packageLimitCheck.allowed;
+      const remaining = Math.min(traditionalLimit.remaining, packageLimitCheck.hourly_remaining);
+
+      return {
+        canProceed,
+        remaining,
+        total: traditionalLimit.total,
+        resetsAt: traditionalLimit.resetsAt,
+        isAtLimit: !canProceed,
+        packageLimitCheck,
+        userType
+      };
+    } catch (error) {
+      console.error('Error checking package rate limit:', error);
+      // Fallback to traditional rate limiting
+      const fallback = this.checkLimit();
+      return {
+        ...fallback,
+        userType: 'anonymous'
+      };
+    }
+  }
+
+  /**
+   * Consume package usage and increment counters
+   */
+  public async consumePackageCredit(
+    userIdentifier: string,
+    packageId: string
+  ): Promise<PackageRateLimitResult> {
+    try {
+      // Consume traditional credit first
+      const traditionalResult = this.consumeCredit();
+      
+      // Increment package usage counter
+      await PhotoPackagesService.incrementPackageUsage(userIdentifier, packageId, 1);
+      
+      return {
+        ...traditionalResult,
+        userType: 'anonymous' // TODO: Determine actual user type
+      };
+    } catch (error) {
+      console.error('Error consuming package credit:', error);
+      // Fallback to traditional consumption only
+      const fallback = this.consumeCredit();
+      return {
+        ...fallback,
+        userType: 'anonymous'
+      };
+    }
+  }
+
+  /**
+   * Check if user can proceed with package generation
+   */
+  public async canProceedWithPackage(
+    userIdentifier: string,
+    packageId: string,
+    userType: 'anonymous' | 'free' | 'paid' | 'premium' = 'anonymous'
+  ): Promise<{
+    canProceed: boolean;
+    reason?: string;
+    traditionalCheck: RateLimitResult;
+    packageCheck?: RateLimitCheck;
+    userType: string;
+  }> {
+    try {
+      // Check both traditional and package limits
+      const packageResult = await this.checkPackageLimit(userIdentifier, packageId, userType);
+      
+      if (!packageResult.canProceed) {
+        let reason = 'Rate limit exceeded';
+        
+        if (!packageResult.packageLimitCheck?.allowed) {
+          reason = packageResult.packageLimitCheck?.reason || 'Package rate limit exceeded';
+        } else if (packageResult.isAtLimit) {
+          reason = 'Daily generation limit reached';
+        }
+        
+        return {
+          canProceed: false,
+          reason,
+          traditionalCheck: {
+            canProceed: packageResult.canProceed,
+            remaining: packageResult.remaining,
+            total: packageResult.total,
+            resetsAt: packageResult.resetsAt,
+            isAtLimit: packageResult.isAtLimit
+          },
+          packageCheck: packageResult.packageLimitCheck,
+          userType: packageResult.userType || 'anonymous'
+        };
+      }
+      
+      return {
+        canProceed: true,
+        traditionalCheck: {
+          canProceed: packageResult.canProceed,
+          remaining: packageResult.remaining,
+          total: packageResult.total,
+          resetsAt: packageResult.resetsAt,
+          isAtLimit: packageResult.isAtLimit
+        },
+        packageCheck: packageResult.packageLimitCheck,
+        userType: packageResult.userType || 'anonymous'
+      };
+    } catch (error) {
+      console.error('Error checking package generation eligibility:', error);
+      // Fallback to traditional check only
+      const traditionalCheck = this.checkLimit();
+      return {
+        canProceed: traditionalCheck.canProceed,
+        reason: traditionalCheck.canProceed ? undefined : 'Daily generation limit reached',
+        traditionalCheck,
+        userType: 'anonymous'
+      };
+    }
+  }
+
+  /**
+   * Get comprehensive rate limit status including package info
+   */
+  public async getPackageRateLimitStatus(
+    userIdentifier: string,
+    packageId?: string,
+    userType: 'anonymous' | 'free' | 'paid' | 'premium' = 'anonymous'
+  ): Promise<{
+    traditional: RateLimitResult;
+    package?: RateLimitCheck;
+    canProceed: boolean;
+    nextResetTime: Date;
+    userType: string;
+  }> {
+    const traditional = this.checkLimit();
+    let packageCheck: RateLimitCheck | undefined;
+    let canProceed = traditional.canProceed;
+
+    if (packageId) {
+      try {
+        packageCheck = await PhotoPackagesService.checkPackageRateLimit(
+          userIdentifier,
+          packageId,
+          userType
+        );
+        canProceed = traditional.canProceed && packageCheck.allowed;
+      } catch (error) {
+        console.error('Error getting package rate limit status:', error);
+        // Continue with traditional limits only
+      }
+    }
+
+    return {
+      traditional,
+      package: packageCheck,
+      canProceed,
+      nextResetTime: this.getNextResetTime(),
+      userType
+    };
   }
 }
 

@@ -165,7 +165,7 @@ CREATE POLICY "Admins can view system metrics" ON system_metrics
   );
 
 CREATE POLICY "Service role can insert system metrics" ON system_metrics
-  FOR INSERT USING (auth.jwt() ->> 'role' = 'service_role');
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 
 -- Daily metrics - admins can view, service role can manage
 CREATE POLICY "Admins can view daily metrics" ON daily_metrics
@@ -189,7 +189,7 @@ CREATE POLICY "Admins can view user activity logs" ON user_activity_logs
   );
 
 CREATE POLICY "Service role can insert activity logs" ON user_activity_logs
-  FOR INSERT USING (auth.jwt() ->> 'role' = 'service_role');
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 
 -- Alert configs - admins can manage
 CREATE POLICY "Admins can manage alert configs" ON alert_configs
@@ -219,7 +219,7 @@ CREATE POLICY "Admins can acknowledge alerts" ON alert_history
   );
 
 CREATE POLICY "Service role can create alerts" ON alert_history
-  FOR INSERT USING (auth.jwt() ->> 'role' = 'service_role');
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 
 -- Revenue analytics - admins can view, service role can manage
 CREATE POLICY "Admins can view revenue analytics" ON revenue_analytics

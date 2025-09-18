@@ -7,12 +7,17 @@ import { GeneratedContent } from '../types'
 import { userIdentificationService } from './userIdentificationService'
 import { supabase } from './supabaseClient'
 import { promptService } from './promptService'
+import { PhotoPackagesService, type Package, type PackageTheme, type PackagePricingTier } from './photoPackagesService'
+import { creditsService } from './creditsService'
 
 export interface GenerationOptions {
   imageFile: File
   prompt: string
   style: string
   retryCount?: number
+  packageId?: string
+  tierId?: string
+  themeId?: string
 }
 
 export interface GenerationResult {
@@ -25,6 +30,9 @@ export interface GenerationResult {
     reset_at: string
   }
   processing_time_ms?: number
+  usageId?: string
+  creditsUsed?: number
+  remainingCredits?: number
 }
 
 export interface RateLimitStatus {
@@ -93,6 +101,114 @@ class SecureGeminiService {
     }
     
     return undefined
+  }
+
+  /**
+   * Check package rate limits and validate usage
+   */
+  private async validatePackageUsage(
+    packageId?: string, 
+    tierId?: string
+  ): Promise<{ canProceed: boolean; userType: string; error?: string }> {
+    try {
+      const identification = await userIdentificationService.getCurrentIdentification()
+      const userType = PhotoPackagesService.getUserType(
+        identification.userType !== 'anonymous',
+        0, // TODO: Get actual paid credits from user profile
+        0  // TODO: Get actual bonus credits from user profile
+      )
+
+      if (packageId) {
+        // Check package-specific rate limits
+        const rateLimitCheck = await PhotoPackagesService.checkPackageRateLimit(
+          identification.userId,
+          packageId,
+          userType
+        )
+
+        if (!rateLimitCheck.allowed) {
+          return {
+            canProceed: false,
+            userType,
+            error: rateLimitCheck.reason || 'Package rate limit exceeded'
+          }
+        }
+      }
+
+      return { canProceed: true, userType }
+    } catch (error) {
+      console.error('Error validating package usage:', error)
+      return {
+        canProceed: false,
+        userType: 'anonymous',
+        error: 'Failed to validate usage'
+      }
+    }
+  }
+
+  /**
+   * Process package usage and deduct credits
+   */
+  private async processPackageUsage(
+    packageId: string,
+    tierId: string,
+    themesUsed: string[] = [],
+    uploadType: string = 'couple'
+  ): Promise<{ success: boolean; usageId?: string; creditsUsed?: number; error?: string }> {
+    try {
+      const identification = await userIdentificationService.getCurrentIdentification()
+      
+      // Use the enhanced credits service to handle package consumption
+      const result = await creditsService.consumePackageCredits(
+        packageId,
+        tierId,
+        themesUsed,
+        identification.sessionId,
+        uploadType
+      )
+
+      if (result.success) {
+        return {
+          success: true,
+          usageId: result.usageId,
+          creditsUsed: result.creditsUsed
+        }
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Failed to process package usage'
+        }
+      }
+    } catch (error) {
+      console.error('Error processing package usage:', error)
+      return {
+        success: false,
+        error: 'Failed to process package usage'
+      }
+    }
+  }
+
+  /**
+   * Complete package usage tracking
+   */
+  private async completePackageUsage(
+    usageId: string,
+    status: 'completed' | 'failed' | 'cancelled',
+    processingTime?: number,
+    errorMessage?: string
+  ): Promise<void> {
+    try {
+      await PhotoPackagesService.completePackageUsage(
+        usageId,
+        status,
+        processingTime,
+        undefined, // quality score
+        errorMessage
+      )
+    } catch (error) {
+      console.error('Error completing package usage:', error)
+      // Don't throw - this is tracking only
+    }
   }
 
   /**
@@ -195,9 +311,39 @@ class SecureGeminiService {
    * Generate portrait with secure backend
    */
   public async generatePortrait(options: GenerationOptions): Promise<GenerationResult> {
-    const { imageFile, prompt, style, retryCount = 0 } = options
+    const { imageFile, prompt, style, retryCount = 0, packageId, tierId, themeId } = options
+    let usageId: string | undefined
+    const startTime = Date.now()
 
     try {
+      // Validate package usage if using package system
+      if (packageId && tierId) {
+        const validation = await this.validatePackageUsage(packageId, tierId)
+        if (!validation.canProceed) {
+          return {
+            success: false,
+            error: validation.error || 'Package usage validation failed'
+          }
+        }
+
+        // Process package usage and deduct credits
+        const usageResult = await this.processPackageUsage(
+          packageId,
+          tierId,
+          [themeId || style],
+          'couple' // TODO: Get from photo type parameter
+        )
+
+        if (!usageResult.success) {
+          return {
+            success: false,
+            error: usageResult.error || 'Failed to process package usage'
+          }
+        }
+
+        usageId = usageResult.usageId
+      }
+
       // Get user identification
       const identification = await userIdentificationService.getCurrentIdentification()
       
@@ -218,19 +364,44 @@ class SecureGeminiService {
       const result = await this.callBackendAPI(requestData)
 
       if (result.success && result.data) {
+        // Complete package usage tracking if applicable
+        if (usageId) {
+          const processingTime = Date.now() - startTime
+          await this.completePackageUsage(usageId, 'completed', processingTime)
+        }
+
         // Track successful generation
         await userIdentificationService.trackActivity('portrait_generated', {
           style,
-          processing_time: result.processing_time_ms
+          processing_time: result.processing_time_ms,
+          packageId,
+          tierId,
+          themeId
         })
 
-        return result
+        return {
+          ...result,
+          usageId,
+          creditsUsed: usageResult.creditsUsed
+        }
+      }
+
+      // Mark usage as failed if applicable
+      if (usageId) {
+        const processingTime = Date.now() - startTime
+        await this.completePackageUsage(usageId, 'failed', processingTime, result.error)
       }
 
       return result
 
     } catch (error: any) {
       console.error(`Error generating portrait (attempt ${retryCount + 1}):`, error)
+      
+      // Mark usage as failed if applicable
+      if (usageId) {
+        const processingTime = Date.now() - startTime
+        await this.completePackageUsage(usageId, 'failed', processingTime, error?.message || 'Generation failed')
+      }
       
       // Extract error details
       let errorMessage = ''
@@ -298,7 +469,7 @@ class SecureGeminiService {
   }
 
   /**
-   * Generate multiple portrait styles
+   * Generate multiple portrait styles with package integration
    */
   public async generateMultiplePortraits(
     imageFile: File,
@@ -306,7 +477,12 @@ class SecureGeminiService {
     customPrompt: string = '',
     photoType: string = 'couple',
     familyMemberCount: number = 3,
-    onProgressUpdate?: (style: string, status: 'in_progress' | 'completed' | 'failed') => void
+    onProgressUpdate?: (style: string, status: 'in_progress' | 'completed' | 'failed') => void,
+    packageConfig?: {
+      packageId: string
+      tierId: string
+      themes?: PackageTheme[]
+    }
   ): Promise<{
     results: (GenerationResult & { style: string })[]
     successful: number
@@ -314,20 +490,74 @@ class SecureGeminiService {
   }> {
     const results: (GenerationResult & { style: string })[] = []
     
-    // Generate prompts for each style using the prompt service
+    // Generate prompts for each style using the prompt service with package support
     const generatePrompt = async (style: string): Promise<string> => {
       try {
-        // Try async version first for fresh database data
+        // If using package system, find the matching theme
+        if (packageConfig?.themes) {
+          const matchingTheme = packageConfig.themes.find(
+            theme => theme.name === style || theme.id === style
+          )
+          
+          if (matchingTheme) {
+            // Build package theme prompt from components
+            let prompt = `Transform the image into a ${style} style wedding portrait.`
+            
+            // Add setting prompt (main description)
+            if (matchingTheme.setting_prompt) {
+              prompt += ` ${matchingTheme.setting_prompt}`
+            }
+            
+            // Add clothing prompt if available
+            if (matchingTheme.clothing_prompt) {
+              prompt += ` Clothing: ${matchingTheme.clothing_prompt}`
+            }
+            
+            // Add atmosphere prompt if available
+            if (matchingTheme.atmosphere_prompt) {
+              prompt += ` Atmosphere: ${matchingTheme.atmosphere_prompt}`
+            }
+            
+            // Add technical prompt if available
+            if (matchingTheme.technical_prompt) {
+              prompt += ` Technical: ${matchingTheme.technical_prompt}`
+            }
+            
+            // Add photo type specific instructions
+            if (photoType === 'single') {
+              prompt += ` This is a SINGLE PERSON portrait - show only one person.`
+            } else if (photoType === 'couple') {
+              prompt += ` This is a COUPLE portrait - show exactly two people.`
+            } else if (photoType === 'family') {
+              prompt += ` This is a FAMILY portrait with ${familyMemberCount} people - show all family members.`
+            }
+            
+            // Add custom prompt if provided
+            if (customPrompt) {
+              prompt += ` ${customPrompt}`
+            }
+            
+            // Add style modifiers if available
+            if (matchingTheme.style_modifiers && matchingTheme.style_modifiers.length > 0) {
+              prompt += ` Style modifiers: ${matchingTheme.style_modifiers.join(', ')}`
+            }
+            
+            if (import.meta.env.DEV) console.log(`[PackageService] Generated prompt for ${photoType} ${style} from package theme:`, prompt.substring(0, 100) + '...')
+            return prompt
+          }
+        }
+
+        // Try database/localStorage prompt service for legacy themes
         const generatedPrompt = await promptService.generatePrompt(
           photoType as 'single' | 'couple' | 'family',
           style,
           customPrompt,
           familyMemberCount
-        );
-        if (import.meta.env.DEV) console.log(`[PromptService] Generated prompt for ${photoType} ${style} from database:`, generatedPrompt.substring(0, 100) + '...');
-        return generatedPrompt;
+        )
+        if (import.meta.env.DEV) console.log(`[PromptService] Generated prompt for ${photoType} ${style} from database:`, generatedPrompt.substring(0, 100) + '...')
+        return generatedPrompt
       } catch (error) {
-        console.warn('Failed to generate prompt from database, trying localStorage:', error);
+        console.warn('Failed to generate prompt from database, trying localStorage:', error)
         
         try {
           // Fallback to sync version (localStorage)
@@ -336,11 +566,11 @@ class SecureGeminiService {
             style,
             customPrompt,
             familyMemberCount
-          );
-          if (import.meta.env.DEV) console.log(`[PromptService] Generated prompt for ${photoType} ${style} from localStorage:`, generatedPrompt.substring(0, 100) + '...');
-          return generatedPrompt;
+          )
+          if (import.meta.env.DEV) console.log(`[PromptService] Generated prompt for ${photoType} ${style} from localStorage:`, generatedPrompt.substring(0, 100) + '...')
+          return generatedPrompt
         } catch (syncError) {
-          console.warn('Failed to generate prompt from localStorage, using hardcoded fallback:', syncError);
+          console.warn('Failed to generate prompt from localStorage, using hardcoded fallback:', syncError)
           
           // Final fallback to hardcoded prompts
           const basePrompts = {
@@ -349,7 +579,7 @@ class SecureGeminiService {
             family: `Transform this family of ${familyMemberCount} people into a beautiful wedding portrait with a "${style}" theme. Crucially, preserve the exact likeness of EACH and EVERY family member's face and unique facial features. Only transform their clothing and the environment. Ensure all ${familyMemberCount} individuals from the original photo are present and their identity is clearly recognizable. ${customPrompt}.`
           }
           
-          return basePrompts[photoType as keyof typeof basePrompts] || basePrompts.couple;
+          return basePrompts[photoType as keyof typeof basePrompts] || basePrompts.couple
         }
       }
     }
@@ -358,7 +588,10 @@ class SecureGeminiService {
     const generateStylePortrait = async (style: string) => {
       const prompt = await generatePrompt(style)
       
-      // Prompt logging removed for production security
+      // Find matching theme ID for package tracking
+      const themeId = packageConfig?.themes?.find(
+        theme => theme.name === style || theme.id === style
+      )?.id
       
       try {
         // Notify that generation is starting
@@ -367,7 +600,10 @@ class SecureGeminiService {
         const result = await this.generatePortrait({
           imageFile,
           prompt,
-          style
+          style,
+          packageId: packageConfig?.packageId,
+          tierId: packageConfig?.tierId,
+          themeId
         })
         
         // Notify completion status

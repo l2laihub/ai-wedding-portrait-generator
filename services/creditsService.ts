@@ -7,6 +7,7 @@
 
 import { supabase } from './supabaseClient';
 import { authService } from './authService';
+import { PhotoPackagesService, type PackagePricingTier } from './photoPackagesService';
 
 export interface UserCredits {
   user_id: string;
@@ -41,6 +42,16 @@ export interface ConsumeResult {
   success: boolean;
   newBalance: CreditBalance;
   error?: string;
+  usageId?: string;
+}
+
+export interface PackageConsumeResult {
+  success: boolean;
+  newBalance: CreditBalance;
+  error?: string;
+  usageId: string;
+  creditsUsed: number;
+  tier: PackagePricingTier;
 }
 
 const FREE_DAILY_LIMIT = 5;
@@ -97,6 +108,157 @@ class CreditsService {
         bonusCredits: 0,
         totalAvailable: 0,
         canUseCredits: false
+      };
+    }
+  }
+
+  /**
+   * Check if user can afford a package tier
+   */
+  async canAffordPackage(packageId: string, tierId: string): Promise<{
+    canAfford: boolean;
+    tier?: PackagePricingTier;
+    creditsNeeded: number;
+    creditsAvailable: number;
+    error?: string;
+  }> {
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) {
+        return {
+          canAfford: false,
+          creditsNeeded: 0,
+          creditsAvailable: 0,
+          error: 'User not authenticated'
+        };
+      }
+
+      // Get package tier info
+      const tier = await PhotoPackagesService.getPricingTierById(tierId);
+      if (!tier) {
+        return {
+          canAfford: false,
+          creditsNeeded: 0,
+          creditsAvailable: 0,
+          error: 'Package tier not found'
+        };
+      }
+
+      // Get current balance
+      const balance = await this.getBalance();
+      const creditsNeeded = 1; // Standard 1 credit per package usage
+
+      return {
+        canAfford: balance.totalAvailable >= creditsNeeded,
+        tier,
+        creditsNeeded,
+        creditsAvailable: balance.totalAvailable
+      };
+    } catch (error) {
+      console.error('Failed to check package affordability:', error);
+      return {
+        canAfford: false,
+        creditsNeeded: 0,
+        creditsAvailable: 0,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Consume credits for package usage
+   */
+  async consumePackageCredits(
+    packageId: string,
+    tierId: string,
+    themesUsed: string[] = [],
+    sessionId?: string,
+    uploadType: string = 'couple'
+  ): Promise<PackageConsumeResult> {
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) {
+        const balance = await this.getBalance();
+        return {
+          success: false,
+          newBalance: balance,
+          error: 'User not authenticated',
+          usageId: '',
+          creditsUsed: 0,
+          tier: {} as PackagePricingTier
+        };
+      }
+
+      // Check affordability first
+      const affordability = await this.canAffordPackage(packageId, tierId);
+      if (!affordability.canAfford || !affordability.tier) {
+        const balance = await this.getBalance();
+        return {
+          success: false,
+          newBalance: balance,
+          error: affordability.error || 'Insufficient credits for package',
+          usageId: '',
+          creditsUsed: 0,
+          tier: affordability.tier || {} as PackagePricingTier
+        };
+      }
+
+      // Process package usage through PhotoPackagesService
+      const result = await PhotoPackagesService.processPackageUsage(
+        user.id,
+        packageId,
+        tierId,
+        sessionId,
+        themesUsed,
+        uploadType
+      );
+
+      if (!result.success) {
+        const balance = await this.getBalance();
+        return {
+          success: false,
+          newBalance: balance,
+          error: result.error || 'Failed to process package usage',
+          usageId: '',
+          creditsUsed: 0,
+          tier: affordability.tier
+        };
+      }
+
+      // Consume the actual credits from user balance
+      const creditConsumption = await this.consumeCredit(
+        `Package usage: ${affordability.tier.name} (1 credit)`
+      );
+
+      if (!creditConsumption.success) {
+        return {
+          success: false,
+          newBalance: creditConsumption.newBalance,
+          error: creditConsumption.error || 'Failed to consume credits',
+          usageId: result.usage_id || '',
+          creditsUsed: 0,
+          tier: affordability.tier
+        };
+      }
+
+      return {
+        success: true,
+        newBalance: creditConsumption.newBalance,
+        usageId: result.usage_id || '',
+        creditsUsed: 1,
+        tier: affordability.tier
+      };
+
+    } catch (error) {
+      console.error('Failed to consume package credits:', error);
+      const balance = await this.getBalance();
+      return {
+        success: false,
+        newBalance: balance,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        usageId: '',
+        creditsUsed: 0,
+        tier: {} as PackagePricingTier
       };
     }
   }
@@ -295,6 +457,61 @@ class CreditsService {
    */
   getCreditsNeeded(portraitCount: number): number {
     return portraitCount; // 1 credit = 1 portrait
+  }
+
+  /**
+   * Get package pricing information with affordability check
+   */
+  async getPackagePricing(packageId: string, tierId: string): Promise<{
+    tier?: PackagePricingTier;
+    canAfford: boolean;
+    creditsNeeded: number;
+    creditsAvailable: number;
+    priceDisplay: string;
+    valueDisplay: string;
+    error?: string;
+  }> {
+    try {
+      const affordability = await this.canAffordPackage(packageId, tierId);
+      
+      if (!affordability.tier) {
+        return {
+          canAfford: false,
+          creditsNeeded: 0,
+          creditsAvailable: 0,
+          priceDisplay: 'N/A',
+          valueDisplay: 'N/A',
+          error: affordability.error
+        };
+      }
+
+      const tier = affordability.tier;
+      const priceDisplay = PhotoPackagesService.formatPackagePrice(
+        tier.price_amount_cents,
+        tier.currency
+      );
+      
+      const valueDisplay = `${tier.included_generations} generation${tier.included_generations !== 1 ? 's' : ''}`;
+
+      return {
+        tier,
+        canAfford: affordability.canAfford,
+        creditsNeeded: affordability.creditsNeeded,
+        creditsAvailable: affordability.creditsAvailable,
+        priceDisplay,
+        valueDisplay
+      };
+    } catch (error) {
+      console.error('Failed to get package pricing:', error);
+      return {
+        canAfford: false,
+        creditsNeeded: 0,
+        creditsAvailable: 0,
+        priceDisplay: 'Error',
+        valueDisplay: 'Error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   /**
