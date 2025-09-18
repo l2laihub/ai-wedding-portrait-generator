@@ -29,11 +29,9 @@ dist-ssr
 .env.*.bak*
 .env.backup
 *.key
-*secret*
 *credentials*
 
 # Documentation with sensitive info
 *oauth*fix*.md
-*secret*setup*.md
 
 #.claude-flow
