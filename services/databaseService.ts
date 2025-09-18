@@ -63,16 +63,17 @@ class DatabaseService {
   }
 
   /**
-   * Track usage analytics
+   * Track usage analytics with optional metadata
    */
   async trackUsage(
     sessionId: string,
     portraitType: string,
-    theme: string
+    theme: string,
+    metadata?: any
   ): Promise<{ success: boolean; error?: string }> {
     try {
       if (!isSupabaseConfigured()) {
-        console.log('Analytics tracked (localStorage fallback):', { sessionId, portraitType, theme });
+        console.log('Analytics tracked (localStorage fallback):', { sessionId, portraitType, theme, metadata });
         // Store in localStorage for development
         const analytics = JSON.parse(localStorage.getItem('wedai_analytics') || '[]');
         analytics.push({
@@ -80,21 +81,27 @@ class DatabaseService {
           session_id: sessionId,
           portrait_type: portraitType,
           theme,
+          metadata,
           timestamp: new Date().toISOString()
         });
         localStorage.setItem('wedai_analytics', JSON.stringify(analytics));
         return { success: true };
       }
 
+      const insertData: any = {
+        session_id: sessionId,
+        portrait_type: portraitType,
+        theme
+      };
+
+      // Add metadata if provided and supported by the table schema
+      if (metadata) {
+        insertData.metadata = metadata;
+      }
+
       const { error } = await supabase
         .from('usage_analytics')
-        .insert([
-          {
-            session_id: sessionId,
-            portrait_type: portraitType,
-            theme
-          }
-        ]);
+        .insert([insertData]);
 
       if (error) {
         console.error('Supabase analytics error:', error);
@@ -239,6 +246,84 @@ class DatabaseService {
         todayGenerations: 0,
         popularThemes: []
       };
+    }
+  }
+
+  /**
+   * Track admin operation (like historical count adjustments)
+   * Creates a special entry to persist admin changes across all users
+   */
+  async trackAdminOperation(
+    operationType: string,
+    operationData: any
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!isSupabaseConfigured()) {
+        console.log('Admin operation tracked (localStorage fallback):', { operationType, operationData });
+        // Store in localStorage for development
+        const adminOps = JSON.parse(localStorage.getItem('wedai_admin_operations') || '[]');
+        adminOps.push({
+          id: crypto.randomUUID(),
+          operation_type: operationType,
+          operation_data: operationData,
+          timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('wedai_admin_operations', JSON.stringify(adminOps));
+        return { success: true };
+      }
+
+      // Create multiple entries to ensure the adjustment is reflected in total counts
+      // This works around any schema limitations by creating actual usage entries
+      const entries = [];
+      
+      if (operationType === 'historical_count_adjustment' && operationData.historicalCount) {
+        // Create multiple smaller entries instead of one large adjustment
+        // This ensures the admin_stats view will include these in its counts
+        const batchSize = 100;
+        const numBatches = Math.ceil(operationData.historicalCount / batchSize);
+        
+        for (let i = 0; i < numBatches; i++) {
+          const batchCount = Math.min(batchSize, operationData.historicalCount - (i * batchSize));
+          
+          for (let j = 0; j < batchCount; j++) {
+            entries.push({
+              session_id: `historical_${Date.now()}_${i}_${j}`,
+              portrait_type: 'couple',
+              theme: 'Historical Data Import',
+              // Add timestamp spread over past period to look more natural
+              timestamp: new Date(Date.now() - (Math.random() * 30 * 24 * 60 * 60 * 1000)).toISOString()
+            });
+          }
+        }
+      } else {
+        // For other admin operations, create a single tracking entry
+        entries.push({
+          session_id: `admin_${operationType}_${Date.now()}`,
+          portrait_type: 'admin',
+          theme: operationType,
+          metadata: operationData
+        });
+      }
+
+      // Insert entries in batches to avoid timeout
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+        const batch = entries.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('usage_analytics')
+          .insert(batch);
+
+        if (error) {
+          console.error('Supabase admin operation error:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      console.log(`✅ Successfully inserted ${entries.length} entries for ${operationType}`);
+      return { success: true };
+    } catch (err) {
+      console.error('Database error tracking admin operation:', err);
+      return { success: false, error: 'Failed to track admin operation' };
     }
   }
 

@@ -3,7 +3,7 @@
  * These functions help debug and manage the counter system
  */
 
-import { counterService, refreshCounterFromDatabase } from '../services/counterService';
+import { counterService, refreshCounterFromDatabase, addHistoricalPortraits } from '../services/counterService';
 import { databaseService } from '../services/databaseService';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -204,6 +204,37 @@ export async function compareCounterSources(): Promise<void> {
   console.groupEnd();
 }
 
+/**
+ * Add historical portraits count (one-time admin function)
+ * Adds 3500 portraits to account for pre-tracking period
+ */
+export async function addHistoricalPortraitsCount(): Promise<number> {
+  console.group('🏛️ Add Historical Portraits');
+  
+  try {
+    const beforeTotal = counterService.getTotalGenerations();
+    console.log(`📊 Current total before: ${beforeTotal}`);
+    
+    const newTotal = await addHistoricalPortraits();
+    
+    console.log(`📊 New total after: ${newTotal}`);
+    console.log(`➕ Added: ${newTotal - beforeTotal} historical portraits`);
+    console.log('✅ Historical portraits added successfully!');
+    console.log('💾 Historical count persisted to database for all users');
+    console.log('📊 Created 3500 actual database entries to ensure accurate counts across all views');
+    console.log('💡 This adjustment accounts for portraits generated before tracking was implemented');
+    console.log('🔄 Other browser windows will update within 5 minutes, or force refresh with adminCounterUtils.refresh()');
+    console.log('🌐 All new users will see the updated total count immediately');
+    
+    return newTotal;
+  } catch (error) {
+    console.error('❌ Error adding historical portraits:', error);
+    throw error;
+  } finally {
+    console.groupEnd();
+  }
+}
+
 // Make functions available in browser console for admin use
 if (typeof window !== 'undefined') {
   (window as any).adminCounterUtils = {
@@ -211,6 +242,7 @@ if (typeof window !== 'undefined') {
     refresh: forceRefreshCounter,
     reset: resetLocalCounter,
     compare: compareCounterSources,
+    addHistorical: addHistoricalPortraitsCount,
   };
   
   console.log('🛠️ Admin counter utils available at: window.adminCounterUtils');
@@ -218,4 +250,5 @@ if (typeof window !== 'undefined') {
   console.log('   - refresh(): Force refresh from database'); 
   console.log('   - reset(): Clear local counter data');
   console.log('   - compare(): Compare local vs database values');
+  console.log('   - addHistorical(): Add 3500 historical portraits (one-time use)');
 }

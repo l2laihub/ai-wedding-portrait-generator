@@ -390,6 +390,78 @@ class CounterService {
   }
 
   /**
+   * Admin method to add historical portrait count (one-time adjustment)
+   * This adds a fixed number to account for portraits generated before tracking was implemented
+   */
+  async addHistoricalCount(historicalCount: number): Promise<void> {
+    console.log(`Adding ${historicalCount} historical portraits to counter`);
+    console.log(`Current total: ${this.metrics.totalGenerations}`);
+    
+    const oldTotal = this.metrics.totalGenerations;
+    
+    // Add historical count to total (but not daily)
+    this.metrics.totalGenerations += historicalCount;
+    
+    console.log(`New total: ${this.metrics.totalGenerations}`);
+    
+    // Save to localStorage first
+    this.saveMetrics();
+    
+    // Persist to database using admin operation tracking
+    try {
+      if (isSupabaseConfigured()) {
+        console.log('💾 Persisting historical count to database...');
+        
+        // Use the admin operation method to create actual usage entries
+        // This ensures the historical count is reflected in all database views and queries
+        const result = await databaseService.trackAdminOperation(
+          'historical_count_adjustment',
+          {
+            historicalCount,
+            oldTotal,
+            newTotal: this.metrics.totalGenerations,
+            adjustmentType: 'historical_baseline',
+            timestamp: new Date().toISOString()
+          }
+        );
+        
+        if (result.success) {
+          console.log('✅ Historical count persisted to database');
+          console.log(`📊 Created ${historicalCount} database entries to represent historical usage`);
+        } else {
+          throw new Error(result.error || 'Failed to persist to database');
+        }
+        
+        // Force a refresh to ensure the database has the latest data
+        setTimeout(() => {
+          this.refreshFromDatabase();
+        }, 2000); // Slightly longer delay for batch inserts
+      } else {
+        console.warn('⚠️ Database not configured - historical count only saved locally');
+      }
+    } catch (dbError) {
+      console.warn('⚠️ Failed to persist historical count to database:', dbError);
+      console.log('📝 Historical count saved locally, but may not sync to other users');
+    }
+    
+    // Notify listeners of the change
+    this.notifyListeners();
+    
+    // Track this special event in PostHog
+    try {
+      posthogService.track('historical_count_added', {
+        historicalCount,
+        oldTotal,
+        newTotal: this.metrics.totalGenerations,
+        persistedToDatabase: isSupabaseConfigured(),
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.warn('Failed to track historical count addition in PostHog:', error);
+    }
+  }
+
+  /**
    * Admin method to sync with real API usage data
    * This could be called periodically or manually by admin
    */
@@ -467,3 +539,12 @@ export const getDailyCount = () => counterService.getDailyGenerations();
 export const refreshCounterFromDatabase = () => counterService.forceRefreshFromDatabase();
 export const subscribeToCounterChanges = (listener: (count: number) => void) => 
   counterService.subscribe(() => listener(counterService.getTotalGenerations()));
+
+// Admin function to add the historical 3500 portraits (one-time use)
+export const addHistoricalPortraits = async () => {
+  const HISTORICAL_COUNT = 3500;
+  console.log(`🏛️ Adding ${HISTORICAL_COUNT} historical portraits to counter...`);
+  await counterService.addHistoricalCount(HISTORICAL_COUNT);
+  console.log(`✅ Historical portraits added! New total: ${counterService.getTotalGenerations()}`);
+  return counterService.getTotalGenerations();
+};
