@@ -38,37 +38,30 @@ const RATE_LIMITS = {
   premium: { hourly: 100, daily: 500 }
 }
 
-const fileToBase64 = (base64Data: string, mimeType: string) => {
-  return { base64: base64Data, mimeType }
-}
-
 const callGeminiAPI = async (imageData: string, mimeType: string, prompt: string) => {
   const requestBody = {
-    model: 'gemini-2.5-flash-image-preview',
-    contents: {
+    contents: [{
       parts: [
         {
           inlineData: {
-            data: imageData,
             mimeType: mimeType,
+            data: imageData
           }
         },
         {
           text: prompt
         }
       ]
-    },
-    config: {
+    }],
+    generationConfig: {
       responseModalities: ['IMAGE', 'TEXT']
     }
   }
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent', {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GEMINI_API_KEY}`,
-      'x-goog-api-key': GEMINI_API_KEY
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(requestBody)
   })

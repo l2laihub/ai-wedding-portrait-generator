@@ -34,4 +34,16 @@ dist-ssr
 # Documentation with sensitive info
 *oauth*fix*.md
 
+# Test files with credentials/secrets
+*TEST*.js
+*test*.js
+*DEBUG*.js
+*debug*.js
+EDGE_FUNCTION_API_TEST_REPORT.md
+RATE_LIMIT_TESTING_README.md
+
+# Supabase Edge Function environment files
+supabase/functions/.env
+supabase/functions/**/.env
+
 #.claude-flow

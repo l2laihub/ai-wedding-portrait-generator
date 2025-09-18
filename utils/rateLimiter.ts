@@ -42,9 +42,9 @@ export interface RateLimitResult {
 
 class RateLimiter {
   private config: RateLimitConfig = {
-    FREE_DAILY: 3,
+    FREE_DAILY: 3, // Daily limit is 3 photo shoots for anonymous users
     SESSION_KEY: 'wedai_usage',
-    RESET_HOUR: 0 // midnight
+    RESET_HOUR: 0 // midnight Pacific Time
   };
 
   private authConfig: AuthRateLimitConfig = {
@@ -63,28 +63,78 @@ class RateLimiter {
    */
   private getCurrentDateKey(): string {
     const now = new Date();
-    // Adjust for Pacific Time (UTC-8 or UTC-7 depending on DST)
-    const pacificOffset = -8 * 60; // PST is UTC-8
-    const pacificTime = new Date(now.getTime() + (pacificOffset * 60 * 1000));
-    return pacificTime.toISOString().split('T')[0];
+    // Use Intl.DateTimeFormat to properly handle Pacific Time with DST
+    const pacificDateStr = now.toLocaleDateString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    // Convert MM/DD/YYYY to YYYY-MM-DD
+    const [month, day, year] = pacificDateStr.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
 
   /**
-   * Get the next reset time (midnight local time)
+   * Get the next reset time (midnight Pacific Time)
    */
   private getNextResetTime(): Date {
     const now = new Date();
-    const resetTime = new Date(now);
     
-    // Set to midnight tonight
-    resetTime.setHours(24, 0, 0, 0);
+    // Get tomorrow's date in Pacific Time
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
     
-    // If it's already past midnight (shouldn't happen with proper reset), add a day
-    if (resetTime.getTime() <= now.getTime()) {
-      resetTime.setDate(resetTime.getDate() + 1);
+    // Format tomorrow's date in Pacific Time as YYYY-MM-DD
+    const tomorrowPacific = tomorrow.toLocaleDateString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    
+    // Convert MM/DD/YYYY to YYYY-MM-DD 00:00:00 Pacific Time
+    const [month, day, year] = tomorrowPacific.split('/');
+    const midnightPacificStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
+    
+    // Create a formatter for Pacific Time with specific format
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+    // Find the local time that corresponds to midnight Pacific Time tomorrow
+    // We'll check times in the next 48 hours to find when Pacific Time hits our target
+    for (let hoursAhead = 0; hoursAhead < 48; hoursAhead++) {
+      const checkTime = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
+      const pacificTimeStr = formatter.format(checkTime);
+      
+      // Extract date portion in YYYY-MM-DD format
+      const [datePart] = pacificTimeStr.split(', ');
+      const [m, d, y] = datePart.split('/');
+      const checkDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00`;
+      
+      // Check if this matches our target midnight
+      if (checkDateStr === midnightPacificStr) {
+        // Check if we're at midnight (00:00:00)
+        const timePart = pacificTimeStr.split(', ')[1];
+        if (timePart.startsWith('00:00:')) {
+          return checkTime;
+        }
+      }
     }
     
-    return resetTime;
+    // Fallback: return tomorrow at local midnight
+    const fallback = new Date(now);
+    fallback.setDate(fallback.getDate() + 1);
+    fallback.setHours(0, 0, 0, 0);
+    return fallback;
   }
 
   /**
@@ -109,7 +159,7 @@ class RateLimiter {
 
       // Check if we need to reset for a new day
       if (data.date !== currentDate) {
-        console.log('Date changed, creating fresh data. Old:', data.date, 'New:', currentDate);
+        console.log('Date changed in getUsageData, creating fresh data. Old:', data.date, 'New:', currentDate);
         return this.createFreshUsageData();
       }
 
@@ -194,12 +244,17 @@ class RateLimiter {
    * Consume one credit (call this when generation starts)
    */
   public consumeCredit(): RateLimitResult {
+    // Always check for auto-reset first
+    this.checkAndAutoReset();
+    
     const usage = this.getUsageData();
     
     console.log('consumeCredit called:', {
       currentUsage: usage.used,
       limit: this.config.FREE_DAILY,
-      canConsume: usage.used < this.config.FREE_DAILY
+      canConsume: usage.used < this.config.FREE_DAILY,
+      date: usage.date,
+      currentDate: this.getCurrentDateKey()
     });
     
     if (usage.used >= this.config.FREE_DAILY) {
@@ -316,9 +371,21 @@ class RateLimiter {
    * Get current usage stats for display
    */
   public getUsageStats(): { used: number; remaining: number; total: number; percentage: number } {
+    // Always check for auto-reset first
+    this.checkAndAutoReset();
+    
     const usage = this.getUsageData();
     const remaining = Math.max(0, this.config.FREE_DAILY - usage.used);
     const percentage = Math.round((usage.used / this.config.FREE_DAILY) * 100);
+
+    console.log('Usage stats:', {
+      used: usage.used,
+      remaining,
+      total: this.config.FREE_DAILY,
+      percentage,
+      date: usage.date,
+      currentDate: this.getCurrentDateKey()
+    });
 
     return {
       used: usage.used,
@@ -332,14 +399,36 @@ class RateLimiter {
    * Check if it's a new day and auto-reset if needed
    */
   public checkAndAutoReset(): boolean {
-    const usage = this.getUsageData();
-    const currentDate = this.getCurrentDateKey();
+    try {
+      const stored = localStorage.getItem(this.config.SESSION_KEY);
+      if (!stored) {
+        console.log('No stored usage data in checkAndAutoReset, creating fresh data');
+        this.resetUsage();
+        return true;
+      }
 
-    if (usage.date !== currentDate) {
+      const usage: UsageData = JSON.parse(stored);
+      const currentDate = this.getCurrentDateKey();
+
+      console.log('Auto-reset check:', {
+        storedDate: usage.date,
+        currentDate,
+        needsReset: usage.date !== currentDate
+      });
+
+      if (usage.date !== currentDate) {
+        console.log('Date changed, resetting usage. Old:', usage.date, 'New:', currentDate);
+        this.resetUsage();
+        return true; // Reset occurred
+      }
+      
+      return false; // No reset needed
+    } catch (error) {
+      console.error('Error in checkAndAutoReset:', error);
+      // On error, reset to be safe
       this.resetUsage();
-      return true; // Reset occurred
+      return true;
     }
-    return false; // No reset needed
   }
 
   /**

@@ -223,7 +223,14 @@ function App({ navigate }: AppProps) {
         return;
       }
       
-      console.log('✅ Enhanced generation anonymous user rate limit check passed');
+      // Consume credit BEFORE API call to ensure accurate tracking
+      const limitResult = rateLimiter.consumeCredit();
+      console.log('✅ Enhanced generation anonymous user rate limit check passed, credit consumed proactively');
+      
+      // Update UI immediately to show correct remaining count
+      window.dispatchEvent(new CustomEvent('counterUpdate', {
+        detail: { remaining: limitResult.remaining }
+      }));
     }
 
     // Initialize user identification service
@@ -235,6 +242,24 @@ function App({ navigate }: AppProps) {
       if (!balance.canUseCredits) {
         setShowLimitModal(true);
         return;
+      }
+      
+      // Only apply backend rate limits to free tier users (those with NO paid or bonus credits)
+      if (balance.paidCredits === 0 && balance.bonusCredits === 0) {
+        console.log('📊 Free tier authenticated user - checking backend rate limits for enhanced generation');
+        try {
+          const backendLimit = await secureGeminiService.checkRateLimit();
+          if (!backendLimit.canProceed) {
+            setShowLimitModal(true);
+            setError(`Daily limit reached. Upgrade to premium for unlimited generations!`);
+            return;
+          }
+        } catch (backendError) {
+          console.warn('Backend rate limit check failed for free tier user:', backendError);
+          // Continue if backend check fails - rely on credit balance check above
+        }
+      } else {
+        console.log('💎 Premium user with paid/bonus credits - skipping rate limits for enhanced generation');
       }
     } else {
       // Also check backend rate limits to ensure consistency for anonymous users
@@ -433,7 +458,39 @@ function App({ navigate }: AppProps) {
           console.warn('Failed to consume credit after generation:', consumeResult.error);
         }
       }
-      // Note: For anonymous users, credit is now consumed BEFORE API call to prevent rate limit issues
+      
+      // For anonymous users: Check if ALL generations failed
+      if (!user && generationResult.successful === 0) {
+        const hasRateLimitError = generationResult.results.some(result => 
+          result.error && (
+            result.error.includes('Daily limit') || 
+            result.error.includes('rate limit') ||
+            result.error.includes('Rate limit')
+          )
+        );
+        
+        if (hasRateLimitError) {
+          console.log('🔄 Enhanced: All generations failed due to rate limiting - showing limit modal');
+          // Don't restore credit - keep it consumed to maintain accurate count
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: 0 }
+          }));
+          
+          // Show limit modal instead of continuing with error display
+          setShowLimitModal(true);
+          setIsLoading(false);
+          return;
+        } else {
+          // All generations failed for reasons other than rate limiting
+          console.log('🔄 Enhanced: All generations failed (not rate limit) - restoring credit');
+          const restored = rateLimiter.restoreCredit();
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: restored.remaining }
+          }));
+        }
+      }
+      
+      // Note: For anonymous users, credit is consumed BEFORE API call to prevent rate limit issues
       
       setGeneratedContents(finalContents);
       
@@ -483,6 +540,16 @@ function App({ navigate }: AppProps) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred during the generation process.";
       posthogService.trackGenerationFailed(generationId, errorMessage);
+      
+      // If generation failed completely for anonymous user, restore the consumed credit
+      if (!user) {
+        console.log('🔄 Enhanced: Restoring credit for anonymous user due to generation error');
+        const restored = rateLimiter.restoreCredit();
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: restored.remaining }
+        }));
+      }
+      
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -548,6 +615,24 @@ function App({ navigate }: AppProps) {
       if (!balance.canUseCredits) {
         setShowLimitModal(true);
         return;
+      }
+      
+      // Only apply backend rate limits to free tier users (those with NO paid or bonus credits)
+      if (balance.paidCredits === 0 && balance.bonusCredits === 0) {
+        console.log('📊 Free tier authenticated user - checking backend rate limits');
+        try {
+          const backendLimit = await secureGeminiService.checkRateLimit();
+          if (!backendLimit.canProceed) {
+            setShowLimitModal(true);
+            setError(`Daily limit reached. Upgrade to premium for unlimited generations!`);
+            return;
+          }
+        } catch (backendError) {
+          console.warn('Backend rate limit check failed for free tier user:', backendError);
+          // Continue if backend check fails - rely on credit balance check above
+        }
+      } else {
+        console.log('💎 Premium user with paid/bonus credits - skipping rate limits');
       }
     } else {
       // Also check backend rate limits to ensure consistency for anonymous users
@@ -668,7 +753,7 @@ function App({ navigate }: AppProps) {
         }
       }
       
-      // For anonymous users: Check if ALL generations failed due to rate limiting
+      // For anonymous users: Check if ALL generations failed
       if (!user && generationResult.successful === 0) {
         const hasRateLimitError = generationResult.results.some(result => 
           result.error && (
@@ -690,6 +775,14 @@ function App({ navigate }: AppProps) {
           setShowLimitModal(true);
           setIsLoading(false); // Stop loading immediately
           return;
+        } else {
+          // All generations failed for reasons other than rate limiting
+          // Restore the credit since no successful generation occurred
+          console.log('🔄 All generations failed (not rate limit) - restoring credit for anonymous user');
+          const restored = rateLimiter.restoreCredit();
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: restored.remaining }
+          }));
         }
       }
       
