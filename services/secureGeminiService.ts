@@ -41,7 +41,7 @@ class SecureGeminiService {
 
   constructor() {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-    this.edgeFunctionUrl = `${supabaseUrl}/functions/v1/portrait-generation-simple`
+    this.edgeFunctionUrl = `${supabaseUrl}/functions/v1/portrait-generation`
   }
 
   /**

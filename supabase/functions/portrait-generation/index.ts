@@ -195,14 +195,14 @@ const generateRequestHash = async (imageData: string, prompt: string): Promise<s
 const getUserType = async (userId: string | null): Promise<'anonymous' | 'authenticated' | 'premium'> => {
   if (!userId) return 'anonymous'
   
-  // Check if user has premium credits
+  // Check if user has any credits (paid or bonus)
   const { data: credits } = await supabase
     .from('user_credits')
-    .select('paid_credits')
+    .select('paid_credits, bonus_credits')
     .eq('user_id', userId)
     .single()
   
-  if (credits && credits.paid_credits > 0) {
+  if (credits && (credits.paid_credits > 0 || credits.bonus_credits > 0)) {
     return 'premium'
   }
   
@@ -282,10 +282,25 @@ serve(async (req) => {
       }
     }
 
+    // Get authenticated user ID from JWT token if available
+    let authenticatedUserId: string | null = null
+    const authHeader = req.headers.get('authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
+        authenticatedUserId = user?.id || null
+      } catch (error) {
+        console.warn('Failed to get user from token:', error)
+      }
+    }
+
+    // Use authenticated user ID over request body userId for security
+    const finalUserId = authenticatedUserId || userId || null
+
     // Determine user type and identifier for rate limiting
-    const userType = await getUserType(userId || null)
-    const identifier = userId || sessionId || clientIP
-    const identifierType = userId ? 'user' : sessionId ? 'anonymous' : 'ip'
+    const userType = await getUserType(finalUserId)
+    const identifier = finalUserId || sessionId || clientIP
+    const identifierType = finalUserId ? 'user' : sessionId ? 'anonymous' : 'ip'
 
     // Check rate limits
     const rateLimitResult = await checkRateLimit(identifier, identifierType, userType)
@@ -312,7 +327,7 @@ serve(async (req) => {
 
     // Record the generation request
     const requestId = await recordGenerationRequest(
-      userId || null,
+      finalUserId,
       sessionId || null,
       clientIP,
       userAgent,
