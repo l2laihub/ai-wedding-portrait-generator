@@ -61,9 +61,10 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
           console.log('UsageCounter: Daily limit was auto-reset due to new day');
         }
         
-        // Get fresh rate limiter data
+        // Get fresh rate limiter data and force UI sync
         const info = rateLimiter.checkLimit();
         console.log('UsageCounter: Rate limiter info updated:', info);
+        
         setLimitInfo(info);
         setCreditBalance(null);
         
@@ -109,6 +110,17 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
     // Listen for counter update events for real-time synchronization
     const handleCounterUpdate = (event?: CustomEvent) => {
       if (import.meta.env.DEV) console.log('UsageCounter: Received counterUpdate event', event?.detail);
+      
+      // If this is a force refresh, ensure we get the most current rate limiter state
+      if (event?.detail?.forceRefresh && !user) {
+        console.log('UsageCounter: Force refresh requested, validating rate limiter state');
+        // Double-check the rate limiter state to ensure UI accuracy
+        setTimeout(() => {
+          const freshInfo = rateLimiter.checkLimit();
+          setLimitInfo(freshInfo);
+        }, 50);
+      }
+      
       updateUsageInfo();
     };
 

@@ -107,6 +107,20 @@ const PromptManagement: React.FC = () => {
   const [testMode, setTestMode] = useState(false);
   const [testStyle, setTestStyle] = useState('Classic & Timeless Wedding');
   const [testCustomPrompt, setTestCustomPrompt] = useState('');
+  
+  // Package-related state
+  const [activeTab, setActiveTab] = useState<'legacy' | 'packages'>('packages');
+  const [packages, setPackages] = useState<any[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
+  const [packagePrompts, setPackagePrompts] = useState<{
+    single_prompt_template: string;
+    couple_prompt_template: string;
+    family_prompt_template: string;
+  }>({
+    single_prompt_template: '',
+    couple_prompt_template: '',
+    family_prompt_template: ''
+  });
   const [testFamilyCount, setTestFamilyCount] = useState(3);
 
   const [weddingStyles, setWeddingStyles] = useState<string[]>([]);
@@ -116,6 +130,7 @@ const PromptManagement: React.FC = () => {
 
   useEffect(() => {
     loadPrompts();
+    loadPackages();
     checkAdminStatus();
     initializeThemeSystem();
   }, []);
@@ -497,6 +512,85 @@ const PromptManagement: React.FC = () => {
     return prompts.filter(p => p.type === type);
   };
 
+  // Load packages from database
+  const loadPackages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('photo_packages')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.warn('Failed to load packages:', error);
+        return;
+      }
+      
+      setPackages(data || []);
+    } catch (error) {
+      console.warn('Error loading packages:', error);
+    }
+  };
+
+  // Load package prompt templates when package is selected
+  const loadPackagePrompts = async (packageId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('photo_packages')
+        .select('single_prompt_template, couple_prompt_template, family_prompt_template')
+        .eq('id', packageId)
+        .single();
+      
+      if (error) {
+        console.error('Failed to load package prompts:', error);
+        return;
+      }
+      
+      setPackagePrompts({
+        single_prompt_template: data.single_prompt_template || '',
+        couple_prompt_template: data.couple_prompt_template || '',
+        family_prompt_template: data.family_prompt_template || ''
+      });
+    } catch (error) {
+      console.error('Error loading package prompts:', error);
+    }
+  };
+
+  // Save package prompt templates
+  const savePackagePrompts = async () => {
+    if (!selectedPackage) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('photo_packages')
+        .update({
+          single_prompt_template: packagePrompts.single_prompt_template,
+          couple_prompt_template: packagePrompts.couple_prompt_template,
+          family_prompt_template: packagePrompts.family_prompt_template,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedPackage.id);
+      
+      if (error) {
+        setError('Failed to save package prompts: ' + error.message);
+        return;
+      }
+      
+      setSuccess('Package prompts saved successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error) {
+      setError('Error saving package prompts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle package selection
+  const handlePackageSelect = (pkg: any) => {
+    setSelectedPackage(pkg);
+    loadPackagePrompts(pkg.id);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -648,7 +742,163 @@ const PromptManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Tabs Navigation */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-1 flex space-x-1">
+        <button
+          onClick={() => setActiveTab('packages')}
+          className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'packages'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Package Prompts
+        </button>
+        <button
+          onClick={() => setActiveTab('legacy')}
+          className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'legacy'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Legacy Prompts
+        </button>
+      </div>
+
+      {/* Package Prompts Tab */}
+      {activeTab === 'packages' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Package List */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Photo Packages</h3>
+            
+            <div className="space-y-3">
+              {packages.map(pkg => (
+                <button
+                  key={pkg.id}
+                  onClick={() => handlePackageSelect(pkg)}
+                  className={`w-full text-left p-4 rounded-lg border transition-colors ${
+                    selectedPackage?.id === pkg.id
+                      ? 'border-purple-500 bg-purple-900/20 text-purple-300'
+                      : 'border-gray-600 bg-gray-700 text-gray-300 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{pkg.name}</span>
+                    <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded">
+                      {pkg.category}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {pkg.description}
+                  </div>
+                </button>
+              ))}
+              
+              {packages.length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <p>No packages found</p>
+                  <p className="text-sm mt-1">Create packages in Package Management</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Package Prompt Editor */}
+          <div className="lg:col-span-2 bg-gray-800 rounded-lg border border-gray-700 p-6">
+            {selectedPackage ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">{selectedPackage.name} Prompts</h3>
+                    <p className="text-sm text-gray-400">
+                      Edit prompt templates for {selectedPackage.category} package
+                    </p>
+                  </div>
+                  <button
+                    onClick={savePackagePrompts}
+                    disabled={loading}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    <Icon path={iconPaths.save} className="w-4 h-4 mr-2 inline" />
+                    {loading ? 'Saving...' : 'Save Prompts'}
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Single Portrait Prompt */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Single Portrait Template
+                    </label>
+                    <textarea
+                      value={packagePrompts.single_prompt_template}
+                      onChange={(e) => setPackagePrompts(prev => ({
+                        ...prev,
+                        single_prompt_template: e.target.value
+                      }))}
+                      className="w-full h-32 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-vertical"
+                      placeholder="Enter prompt template for single person portraits..."
+                    />
+                  </div>
+
+                  {/* Couple Portrait Prompt */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Couple Portrait Template
+                    </label>
+                    <textarea
+                      value={packagePrompts.couple_prompt_template}
+                      onChange={(e) => setPackagePrompts(prev => ({
+                        ...prev,
+                        couple_prompt_template: e.target.value
+                      }))}
+                      className="w-full h-32 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-vertical"
+                      placeholder="Enter prompt template for couple portraits..."
+                    />
+                  </div>
+
+                  {/* Family Portrait Prompt */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Family Portrait Template
+                    </label>
+                    <textarea
+                      value={packagePrompts.family_prompt_template}
+                      onChange={(e) => setPackagePrompts(prev => ({
+                        ...prev,
+                        family_prompt_template: e.target.value
+                      }))}
+                      className="w-full h-32 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-vertical"
+                      placeholder="Enter prompt template for family portraits..."
+                    />
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-gray-300 mb-2">Template Variables</h4>
+                  <div className="text-xs text-gray-400 space-y-1">
+                    <p><code className="bg-gray-800 px-1 rounded">{'{style}'}</code> - The selected theme/style name</p>
+                    <p><code className="bg-gray-800 px-1 rounded">{'{customPrompt}'}</code> - User's custom prompt input</p>
+                    <p><code className="bg-gray-800 px-1 rounded">{'{familyMemberCount}'}</code> - Number of family members (family only)</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 py-12">
+                <Icon path={iconPaths.edit} className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                <h3 className="text-lg font-medium mb-2">No Package Selected</h3>
+                <p>Select a package from the list to edit its prompt templates</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy Prompts Tab */}
+      {activeTab === 'legacy' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Prompt List */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Prompt Templates</h3>
@@ -900,6 +1150,7 @@ const PromptManagement: React.FC = () => {
           )}
         </div>
       </div>
+        )}
 
     </div>
   );

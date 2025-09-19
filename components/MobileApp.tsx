@@ -26,6 +26,7 @@ import UpgradePrompt from './UpgradePrompt';
 import PricingModal from './PricingModal';
 import HelpSupportModal from './HelpSupportModal';
 import SettingsModal from './SettingsModal';
+import SimplePackagePicker from './SimplePackagePicker';
 
 // Skeleton components
 import {
@@ -125,6 +126,11 @@ const MobileApp: React.FC<MobileAppProps> = ({
   setShowLoginModal,
   setShowProfileModal,
   setLoginMode,
+  // Package-related props
+  selectedPackage,
+  showPackagePicker,
+  setShowPackagePicker,
+  onPackageSelected,
   stylesToGenerate = [],
   generationProgress = [],
   resetState
@@ -193,6 +199,7 @@ const MobileApp: React.FC<MobileAppProps> = ({
   // Mobile generate handler wrapper
   const handleMobileGenerate = async () => {
     try {
+      console.log('📱 Mobile generation starting with selectedPackage:', selectedPackage?.name || 'none');
       await handleGenerate();
       if (generatedContents && generatedContents.length > 0) {
         showSuccess('Portraits generated successfully!');
@@ -381,33 +388,66 @@ const MobileApp: React.FC<MobileAppProps> = ({
         </div>
 
 
-        {/* Image Upload Area - Only show if no image */}
-        {!sourceImageUrl && (
-          <SuspenseImageUploader 
-            onImageUpload={handleMobileImageUpload}
-            sourceImageUrl={sourceImageUrl}
+        {/* Image Upload Area - Always show (displays upload or preview) */}
+        <SuspenseImageUploader 
+          onImageUpload={handleMobileImageUpload}
+          sourceImageUrl={sourceImageUrl}
+        />
+
+        {/* Package Picker - Only show if image uploaded but no package selected */}
+        {sourceImageUrl && showPackagePicker && (
+          <SimplePackagePicker
+            onPackageSelected={onPackageSelected}
+            className="mb-4"
           />
         )}
 
-        {/* Current Image Preview with Generate Button */}
-        {sourceImageUrl && !generatedContents && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4">
-            <h3 className="font-semibold mb-3 text-center">Your Photo</h3>
-            <div className="relative mb-4">
-              <img 
-                src={sourceImageUrl} 
-                alt="Uploaded" 
-                className="w-full max-h-64 object-contain rounded-lg"
-              />
+        {/* Package Selection Button - Show when image uploaded but no package picker visible */}
+        {sourceImageUrl && !showPackagePicker && !selectedPackage && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center">
+            <button
+              onClick={() => setShowPackagePicker && setShowPackagePicker(true)}
+              className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg font-semibold"
+            >
+              🎨 Choose Photo Package
+            </button>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Select from Wedding, Engagement, Professional, or Anniversary styles
+            </p>
+          </div>
+        )}
+
+        {/* Selected Package Status - Show when package selected */}
+        {sourceImageUrl && selectedPackage && !showPackagePicker && (
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-lg">
+                    {selectedPackage.slug === 'wedding-portraits' && '💍'}
+                    {selectedPackage.slug === 'engagement-portraits' && '💕'}
+                    {selectedPackage.slug === 'professional-headshots' && '👔'}
+                    {selectedPackage.slug === 'anniversary-photos' && '🥂'}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">{selectedPackage.name}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">3 random themes • Ready to generate</p>
+                </div>
+              </div>
               <button
-                onClick={resetState}
-                className="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-full"
-                title="Upload new photo"
+                onClick={() => setShowPackagePicker && setShowPackagePicker(true)}
+                className="px-3 py-1 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-800 rounded transition-colors"
               >
-                🔄
+                Change
               </button>
             </div>
-            
+          </div>
+        )}
+
+        {/* Generate Button - Show when image uploaded and package selected */}
+        {sourceImageUrl && !generatedContents && selectedPackage && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4">
             {/* Custom Prompt Input with Generate Button */}
             <SuspensePromptInput
               onSubmit={handleMobileGenerate}

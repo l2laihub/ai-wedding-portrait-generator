@@ -91,6 +91,7 @@ const numberToWord = (num: number): string => {
   return words[num] || num.toString();
 };
 
+
 // Get style-specific pose suggestions for single portraits
 const getStylePose = (style: string): string => {
   const stylePoses: { [key: string]: string } = {
@@ -189,10 +190,35 @@ function App({ navigate }: AppProps) {
   };
 
   // Handle package selection - simplified
-  const handlePackageSelected = (selectedPkg: Package) => {
-    setSelectedPackage(selectedPkg);
-    setShowPackagePicker(false);
+  const handlePackageSelected = async (selectedPkg: Package) => {
+    try {
+      // Reload package data to ensure we have the latest prompt templates
+      const freshPackageData = await PhotoPackagesService.getPackageById(selectedPkg.id);
+      if (freshPackageData) {
+        console.log('Package loaded with prompt templates:', {
+          id: freshPackageData.id,
+          name: freshPackageData.name,
+          hasSinglePrompt: !!freshPackageData.single_prompt_template,
+          hasCouplePrompt: !!freshPackageData.couple_prompt_template,
+          hasFamilyPrompt: !!freshPackageData.family_prompt_template
+        });
+        setSelectedPackage(freshPackageData);
+      } else {
+        // Fallback to the selected package if reload fails
+        console.warn('Failed to reload package data, using original package');
+        setSelectedPackage(selectedPkg);
+      }
+    } catch (error) {
+      console.warn('Error reloading package data:', error);
+      setSelectedPackage(selectedPkg);
+    }
     
+    // Clear previous generation results when switching packages
+    setGeneratedContents(null);
+    setError(null);
+    setCurrentGenerationId(null);
+    
+    setShowPackagePicker(false);
     // Don't auto-start generation - let user click "Start Photo Shoot"
   };
 
@@ -221,6 +247,22 @@ function App({ navigate }: AppProps) {
       const shuffledThemes = [...allThemes].sort(() => 0.5 - Math.random());
       const themesToGenerate = shuffledThemes.slice(0, 3);
 
+      // Debug: Log package prompt templates
+      console.log('📋 Package prompt templates available:', {
+        packageId: pkg.id,
+        packageName: pkg.name,
+        packageSlug: pkg.slug,
+        photoType,
+        hasSingleTemplate: !!pkg.single_prompt_template,
+        hasCoupleTemplate: !!pkg.couple_prompt_template,
+        hasFamilyTemplate: !!pkg.family_prompt_template,
+        hasBaseTemplate: !!pkg.base_prompt_template,
+        singleTemplate: pkg.single_prompt_template?.substring(0, 150),
+        coupleTemplate: pkg.couple_prompt_template?.substring(0, 150),
+        familyTemplate: pkg.family_prompt_template?.substring(0, 150),
+        baseTemplate: pkg.base_prompt_template?.substring(0, 150)
+      });
+
       // Generate with package-specific prompt template based on photo type
       let packagePromptTemplate = pkg.base_prompt_template;
       if (photoType === 'single' && pkg.single_prompt_template) {
@@ -230,6 +272,13 @@ function App({ navigate }: AppProps) {
       } else if (photoType === 'family' && pkg.family_prompt_template) {
         packagePromptTemplate = pkg.family_prompt_template.replace('{family_count}', familyMemberCount.toString());
       }
+
+      console.log(`🎯 Selected prompt template for ${photoType}:`, {
+        template: packagePromptTemplate?.substring(0, 200),
+        fullLength: packagePromptTemplate?.length,
+        isEngagementTemplate: packagePromptTemplate?.includes('engagement'),
+        isWeddingTemplate: packagePromptTemplate?.includes('wedding')
+      });
 
       // Call simplified package generation
       await handleSimplifiedPackageGenerate(themesToGenerate, packagePromptTemplate, pkg);
@@ -266,9 +315,18 @@ function App({ navigate }: AppProps) {
         console.error('🚫 BLOCKED: Anonymous user at daily limit');
         setShowLimitModal(true);
         setError(`Daily limit reached: You've used all 3 free photo shoots today. Come back tomorrow for 3 more!`);
+        
+        // Force multiple UI updates to ensure consistency
         window.dispatchEvent(new CustomEvent('counterUpdate', {
           detail: { remaining: 0 }
         }));
+        
+        // Additional forced refresh after a small delay to catch any race conditions
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: 0, forceRefresh: true }
+          }));
+        }, 100);
         return;
       }
       
@@ -324,12 +382,40 @@ function App({ navigate }: AppProps) {
     
     // Create enhanced themes for generation
     const enhancedThemes = themes.map(theme => {
-      // Build full prompt using package base template + theme details
-      const fullPrompt = basePrompt
-        .replace('{setting_prompt}', theme.setting_prompt || '')
-        .replace('{clothing_prompt}', theme.clothing_prompt || '')
-        .replace('{atmosphere_prompt}', theme.atmosphere_prompt || '')
-        .replace('{technical_prompt}', theme.technical_prompt || '');
+      // Helper function to add prefix only if not already present
+      const addPrefix = (text: string, prefix: string) => {
+        if (!text) return '';
+        const upperText = text.toUpperCase();
+        if (upperText.startsWith(prefix.toUpperCase() + ':') || upperText.startsWith(prefix.toUpperCase())) {
+          return text; // Already has prefix
+        }
+        return `${prefix}: ${text}`;
+      };
+
+      // Build full prompt using package base template + theme details with prefixes
+      let fullPrompt = basePrompt
+        .replace('{setting_prompt}', addPrefix(theme.setting_prompt || '', 'Setting'))
+        .replace('{clothing_prompt}', addPrefix(theme.clothing_prompt || '', 'Attire'))
+        .replace('{atmosphere_prompt}', addPrefix(theme.atmosphere_prompt || '', 'Mood'))
+        .replace('{technical_prompt}', addPrefix(theme.technical_prompt || '', 'Technical'));
+
+      // Handle {enhanceSection} replacement with structured prefix
+      const enhanceSection = customPrompt ? `, Additional: ${customPrompt}` : '';
+      fullPrompt = fullPrompt.replace('{enhanceSection}', enhanceSection);
+
+      console.log(`🎨 Building prompt for theme "${theme.name}":`, {
+        basePrompt: basePrompt?.substring(0, 100),
+        settingPrompt: theme.setting_prompt,
+        clothingPrompt: theme.clothing_prompt,
+        atmospherePrompt: theme.atmosphere_prompt,
+        technicalPrompt: theme.technical_prompt,
+        customPrompt: customPrompt || '(empty)',
+        enhanceSection: enhanceSection || '(empty)',
+        finalPrompt: fullPrompt?.substring(0, 250),
+        hasEnhanceSectionPlaceholder: fullPrompt?.includes('{enhanceSection}'),
+        isEngagementPrompt: fullPrompt?.includes('engagement'),
+        isWeddingPrompt: fullPrompt?.includes('wedding')
+      });
 
       return {
         id: theme.id,
@@ -390,8 +476,9 @@ function App({ navigate }: AppProps) {
         },
         {
           packageId: packageInfo.id,
-          tierId: 'default', // TODO: Add proper tier support
-          themes: themes // Pass the original themes with full prompt data
+          tierId: 'fallback-tier', // Use fallback tier that's handled by the service
+          themes: themes, // Pass the original themes with full prompt data
+          packageData: packageInfo // Pass the full package data with prompt templates
         }
       );
       
@@ -1482,7 +1569,7 @@ function App({ navigate }: AppProps) {
         loginMode={loginMode}
         // Shared handlers
         handleImageUpload={handleImageUpload}
-        handleGenerate={handleGenerate}
+        handleGenerate={selectedPackage ? handlePackageGenerate : handleGenerate}
         handleCustomPromptChange={handleCustomPromptChange}
         setPhotoType={setPhotoType}
         setFamilyMemberCount={setFamilyMemberCount}
@@ -1530,47 +1617,55 @@ function App({ navigate }: AppProps) {
       />
       
       <main className={getMainClasses()}>
-        <div className={`${isMobile ? "space-y-4" : "space-y-8"} max-w-4xl mx-auto`}>
-          <SuspensePhotoTypeSelector
-            photoType={photoType}
-            onPhotoTypeChange={setPhotoType}
-            familyMemberCount={familyMemberCount}
-            onFamilyMemberCountChange={setFamilyMemberCount}
-          />
+        <div className={`${isMobile ? "space-y-4" : "space-y-8"} max-w-5xl mx-auto`}>
+          <div className="w-full max-w-4xl mx-auto">
+            <SuspensePhotoTypeSelector
+              photoType={photoType}
+              onPhotoTypeChange={setPhotoType}
+              familyMemberCount={familyMemberCount}
+              onFamilyMemberCountChange={setFamilyMemberCount}
+            />
+          </div>
 
           {/* Usage Counter */}
-          <div className="flex justify-center">
+          <div className="w-full max-w-4xl mx-auto flex justify-center">
             <UsageCounter variant="compact" showTimeUntilReset={true} />
           </div>
           
-          <SuspenseImageUploader 
-            onImageUpload={handleImageUpload} 
-            sourceImageUrl={sourceImageUrl} 
-          />
+          <div className="w-full max-w-4xl mx-auto">
+            <SuspenseImageUploader 
+              onImageUpload={handleImageUpload} 
+              sourceImageUrl={sourceImageUrl} 
+            />
+          </div>
 
           {sourceImageUrl && !showPackagePicker && (
-            <div className="flex flex-col items-center space-y-4">
-              <button
-                onClick={() => setShowPackagePicker(true)}
-                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg"
-              >
-                🎨 Choose Photo Package
-              </button>
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                Select from Wedding, Engagement, Professional, or Anniversary styles
-              </p>
+            <div className="w-full max-w-4xl mx-auto">
+              <div className="flex flex-col items-center space-y-4">
+                <button
+                  onClick={() => setShowPackagePicker(true)}
+                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg"
+                >
+                  🎨 Choose Photo Package
+                </button>
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                  Select from Wedding, Engagement, Professional, or Anniversary styles
+                </p>
+              </div>
             </div>
           )}
 
           {showPackagePicker && sourceImageUrl && (
-            <SimplePackagePicker
-              onPackageSelected={handlePackageSelected}
-              className="mb-6"
-            />
+            <div className="w-full max-w-4xl mx-auto">
+              <SimplePackagePicker
+                onPackageSelected={handlePackageSelected}
+                className="mb-6"
+              />
+            </div>
           )}
 
           {sourceImageUrl && !showPackagePicker && selectedPackage && (
-            <div className="space-y-6">
+            <div className="w-full max-w-4xl mx-auto space-y-6">
               {/* Package Selection Status */}
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
                 <div className="flex items-center justify-between">
@@ -1635,19 +1730,21 @@ function App({ navigate }: AppProps) {
           )}
 
           {isLoading && (
-            <Loader 
-              message={
-                isSlowConnection && isMobile 
-                  ? "Creating portraits one by one for better performance..." 
-                  : "Our AI is crafting 3 unique wedding portraits from 10 amazing styles..."
-              } 
-            />
+            <div className="w-full max-w-4xl mx-auto">
+              <Loader 
+                message={
+                  isSlowConnection && isMobile 
+                    ? "Creating portraits one by one for better performance..." 
+                    : "Our AI is crafting 3 unique wedding portraits from 10 amazing styles..."
+                } 
+              />
+            </div>
           )}
 
           {error && (
-            <div className={`
-              text-center p-4 rounded-lg mx-auto transition-colors duration-300
-              ${isMobile ? 'max-w-full' : 'max-w-2xl'}
+            <div className="w-full max-w-4xl mx-auto">
+              <div className={`
+                text-center p-4 rounded-lg transition-colors duration-300
               ${error.includes('Daily API limit') || error.includes('quota') || error.includes('popular today') 
                 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200'
                 : 'bg-red-50 dark:bg-red-900 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-300'
@@ -1692,11 +1789,13 @@ function App({ navigate }: AppProps) {
                   <p>🚀 Your app's popularity is growing fast!</p>
                 </div>
               )}
+              </div>
             </div>
           )}
 
           {generatedContents && (
-            <div>
+            <div className="w-full max-w-4xl mx-auto">
+              <div>
               {/* Use Enhanced or Legacy Image Display */}
               {useEnhancedComponents && enhancedSystemReady ? (
                 <EnhancedComponentErrorBoundary
@@ -1730,6 +1829,7 @@ function App({ navigate }: AppProps) {
                   familyMemberCount={familyMemberCount}
                 />
               )}
+              </div>
             </div>
           )}
 
@@ -1740,7 +1840,7 @@ function App({ navigate }: AppProps) {
             // Show upgrade prompt if user has used 5+ portraits
             if (usageStats.used >= 5) {
               return (
-                <div className="max-w-2xl mx-auto mt-12">
+                <div className="w-full max-w-4xl mx-auto mt-12">
                   <UpgradePrompt 
                     variant="card"
                     onJoinWaitlist={() => setShowLimitModal(true)}

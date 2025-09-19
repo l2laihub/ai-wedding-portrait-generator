@@ -73,6 +73,7 @@ const ThemeManagement: React.FC = () => {
     loadPackageThemes();
   }, []);
 
+
   const loadStyles = async () => {
     setLoading(true);
     try {
@@ -380,8 +381,215 @@ const ThemeManagement: React.FC = () => {
     return uniqueCategories.sort();
   };
 
+  // Package Theme Edit Modal
+  const PackageThemeEditModal = () => {
+    if (editPackageThemeMode && activeTab === 'packages') {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-white">
+                  {selectedPackageTheme ? 'Edit Package Theme' : 'Create New Package Theme'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setEditPackageThemeMode(false);
+                    setSelectedPackageTheme(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-300"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const themeData = {
+                  package_id: formData.get('package_id'),
+                  name: formData.get('name'),
+                  description: formData.get('description'),
+                  setting_prompt: formData.get('setting_prompt'),
+                  clothing_prompt: formData.get('clothing_prompt'),
+                  atmosphere_prompt: formData.get('atmosphere_prompt'),
+                  technical_prompt: formData.get('technical_prompt'),
+                  is_active: formData.get('is_active') === 'on',
+                  is_premium: formData.get('is_premium') === 'on',
+                  popularity_score: parseInt(formData.get('popularity_score') as string) || 0,
+                };
+                savePackageTheme(themeData);
+              }}>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Package *</label>
+                      <select
+                        name="package_id"
+                        defaultValue={selectedPackageTheme?.package_id || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        required
+                      >
+                        <option value="">Select a package</option>
+                        {(() => {
+                          // Properly deduplicate packages by ID
+                          const uniquePackages = packageThemes
+                            .map(t => t.photo_packages)
+                            .filter(Boolean)
+                            .reduce((acc: any[], pkg: any) => {
+                              if (!acc.find(p => p.id === pkg.id)) {
+                                acc.push(pkg);
+                              }
+                              return acc;
+                            }, []);
+                          
+                          return uniquePackages.map((pkg: any) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {pkg.name} ({pkg.category})
+                            </option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                      <input
+                        type="text"
+                        name="name"
+                        defaultValue={selectedPackageTheme?.name || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        placeholder="e.g., Classic Romance"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                      <textarea
+                        name="description"
+                        defaultValue={selectedPackageTheme?.description || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        rows={3}
+                        placeholder="Brief description of the theme"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Popularity Score</label>
+                        <input
+                          type="number"
+                          name="popularity_score"
+                          defaultValue={selectedPackageTheme?.popularity_score || 5}
+                          min="0"
+                          max="10"
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            name="is_active"
+                            defaultChecked={selectedPackageTheme?.is_active ?? true}
+                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-300">Active</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            name="is_premium"
+                            defaultChecked={selectedPackageTheme?.is_premium ?? false}
+                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-300">Premium</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Setting Prompt</label>
+                      <textarea
+                        name="setting_prompt"
+                        defaultValue={selectedPackageTheme?.setting_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={4}
+                        placeholder="Describe the setting and environment..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Clothing Prompt</label>
+                      <textarea
+                        name="clothing_prompt"
+                        defaultValue={selectedPackageTheme?.clothing_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={4}
+                        placeholder="Describe the attire and styling..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Atmosphere Prompt</label>
+                      <textarea
+                        name="atmosphere_prompt"
+                        defaultValue={selectedPackageTheme?.atmosphere_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={3}
+                        placeholder="Describe the mood and feeling..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Technical Prompt</label>
+                      <textarea
+                        name="technical_prompt"
+                        defaultValue={selectedPackageTheme?.technical_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={3}
+                        placeholder="Describe technical photography aspects..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditPackageThemeMode(false);
+                      setSelectedPackageTheme(null);
+                    }}
+                    className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    <Icon path={iconPaths.save} className="w-4 h-4 mr-2" />
+                    {loading ? 'Saving...' : (selectedPackageTheme ? 'Update Theme' : 'Create Theme')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="p-6 space-y-6">
+      <PackageThemeEditModal />
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
@@ -1211,206 +1419,6 @@ const ThemeManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Package Theme Edit Modal - only show when in packages tab */}
-      {editPackageThemeMode && activeTab === 'packages' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-white">
-                  {selectedPackageTheme ? 'Edit Package Theme' : 'Create New Package Theme'}
-                </h3>
-                <button
-                  onClick={() => {
-                    setEditPackageThemeMode(false);
-                    setSelectedPackageTheme(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-300"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                const themeData = {
-                  package_id: formData.get('package_id'),
-                  name: formData.get('name'),
-                  description: formData.get('description'),
-                  setting_prompt: formData.get('setting_prompt'),
-                  clothing_prompt: formData.get('clothing_prompt'),
-                  atmosphere_prompt: formData.get('atmosphere_prompt'),
-                  technical_prompt: formData.get('technical_prompt'),
-                  is_active: formData.get('is_active') === 'on',
-                  is_premium: formData.get('is_premium') === 'on',
-                  popularity_score: parseInt(formData.get('popularity_score') as string) || 0,
-                };
-                savePackageTheme(themeData);
-              }}>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Package *</label>
-                      <select
-                        name="package_id"
-                        defaultValue={selectedPackageTheme?.package_id || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                        required
-                      >
-                        <option value="">Select a package</option>
-                        {(() => {
-                          // Properly deduplicate packages by ID
-                          const uniquePackages = packageThemes
-                            .map(t => t.photo_packages)
-                            .filter(Boolean)
-                            .reduce((acc: any[], pkg: any) => {
-                              if (!acc.find(p => p.id === pkg.id)) {
-                                acc.push(pkg);
-                              }
-                              return acc;
-                            }, []);
-                          
-                          return uniquePackages.map((pkg: any) => (
-                            <option key={pkg.id} value={pkg.id}>
-                              {pkg.name} ({pkg.category})
-                            </option>
-                          ));
-                        })()}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
-                      <input
-                        type="text"
-                        name="name"
-                        defaultValue={selectedPackageTheme?.name || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                        placeholder="e.g., Classic Romance"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                      <textarea
-                        name="description"
-                        defaultValue={selectedPackageTheme?.description || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                        rows={3}
-                        placeholder="Brief description of the theme"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Popularity Score</label>
-                        <input
-                          type="number"
-                          name="popularity_score"
-                          defaultValue={selectedPackageTheme?.popularity_score || 5}
-                          min="0"
-                          max="10"
-                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            name="is_active"
-                            defaultChecked={selectedPackageTheme?.is_active ?? true}
-                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded"
-                          />
-                          <span className="ml-2 text-sm text-gray-300">Active</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            name="is_premium"
-                            defaultChecked={selectedPackageTheme?.is_premium ?? false}
-                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded"
-                          />
-                          <span className="ml-2 text-sm text-gray-300">Premium</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Setting Prompt</label>
-                      <textarea
-                        name="setting_prompt"
-                        defaultValue={selectedPackageTheme?.setting_prompt || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                        rows={4}
-                        placeholder="Describe the setting and environment..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Clothing Prompt</label>
-                      <textarea
-                        name="clothing_prompt"
-                        defaultValue={selectedPackageTheme?.clothing_prompt || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                        rows={4}
-                        placeholder="Describe the attire and styling..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Atmosphere Prompt</label>
-                      <textarea
-                        name="atmosphere_prompt"
-                        defaultValue={selectedPackageTheme?.atmosphere_prompt || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                        rows={3}
-                        placeholder="Describe the mood and feeling..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Technical Prompt</label>
-                      <textarea
-                        name="technical_prompt"
-                        defaultValue={selectedPackageTheme?.technical_prompt || ''}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                        rows={3}
-                        placeholder="Describe technical photography aspects..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditPackageThemeMode(false);
-                      setSelectedPackageTheme(null);
-                    }}
-                    className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    <Icon path={iconPaths.save} className="w-4 h-4 mr-2" />
-                    {loading ? 'Saving...' : (selectedPackageTheme ? 'Update Theme' : 'Create Theme')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
         </>
       )}
     </div>
