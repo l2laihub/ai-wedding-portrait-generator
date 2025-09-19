@@ -1457,8 +1457,8 @@ function App({ navigate }: AppProps) {
     );
   }
 
-  // Temporarily use desktop view for package features
-  if (isMobile && appReady && !selectedPackage && !showPackagePicker) {
+  // Use desktop view on mobile when image is uploaded (for package features)
+  if (isMobile && appReady && !sourceImageUrl) {
     return (
       <MobileApp 
         navigate={navigate}
@@ -1584,26 +1584,19 @@ function App({ navigate }: AppProps) {
                       onClick={() => setShowPackagePicker(true)}
                       className="px-3 py-1 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-800 rounded transition-colors"
                     >
-                      Change
-                    </button>
-                    <button
-                      onClick={() => handlePackageGenerate()}
-                      disabled={isLoading}
-                      className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                    >
-                      {isLoading ? 'Generating...' : 'Start Photo Shoot'}
+                      Change Package
                     </button>
                   </div>
                 </div>
               </div>
               
-              {/* Optional Custom Prompt Input - only show if no package selected */}
-              {!selectedPackage && useEnhancedComponents && enhancedSystemReady ? (
+              {/* Custom Prompt Input */}
+              {useEnhancedComponents && enhancedSystemReady ? (
                 <EnhancedComponentErrorBoundary
                   componentName="EnhancedPromptInput"
                   fallback={
                     <SuspensePromptInput 
-                      onSubmit={handleGenerate} 
+                      onSubmit={selectedPackage ? handlePackageGenerate : handleGenerate} 
                       isLoading={isLoading}
                       customPrompt={customPrompt}
                       onCustomPromptChange={handleCustomPromptChange}
@@ -1615,20 +1608,20 @@ function App({ navigate }: AppProps) {
                   }}
                 >
                   <EnhancedPromptInput
-                    onSubmit={handleEnhancedGenerate}
+                    onSubmit={selectedPackage ? handlePackageGenerate : handleEnhancedGenerate}
                     isLoading={isLoading}
                     customPrompt={customPrompt}
                     onCustomPromptChange={handleCustomPromptChange}
                   />
                 </EnhancedComponentErrorBoundary>
-              ) : !selectedPackage ? (
+              ) : (
                 <SuspensePromptInput 
-                  onSubmit={handleGenerate} 
+                  onSubmit={selectedPackage ? handlePackageGenerate : handleGenerate} 
                   isLoading={isLoading}
                   customPrompt={customPrompt}
                   onCustomPromptChange={handleCustomPromptChange}
                 />
-              ) : null}
+              )}
             </div>
           )}
 
