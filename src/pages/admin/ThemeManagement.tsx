@@ -65,6 +65,7 @@ const ThemeManagement: React.FC = () => {
   const [packageThemes, setPackageThemes] = useState<any[]>([]);
   const [selectedPackageTheme, setSelectedPackageTheme] = useState<any | null>(null);
   const [editPackageThemeMode, setEditPackageThemeMode] = useState(false);
+  const [selectedPackageFilter, setSelectedPackageFilter] = useState<string>('');
 
   useEffect(() => {
     loadStyles();
@@ -168,7 +169,14 @@ const ThemeManagement: React.FC = () => {
         return;
       }
       
-      setPackageThemes(data || []);
+      // Ensure unique themes by ID
+      const uniqueThemes = (data || []).reduce((acc: any[], theme: any) => {
+        if (!acc.find(t => t.id === theme.id)) {
+          acc.push(theme);
+        }
+        return acc;
+      }, []);
+      setPackageThemes(uniqueThemes);
     } catch (error: any) {
       console.error('Failed to load package themes:', error);
       setPackageThemes([]);
@@ -486,18 +494,60 @@ const ThemeManagement: React.FC = () => {
               <div className="text-sm text-gray-400">Premium Themes</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-2xl font-bold text-green-400">{Array.from(new Set(packageThemes.map(t => t.photo_packages?.category))).length}</div>
+              <div className="text-2xl font-bold text-green-400">{new Set(packageThemes.map(t => t.photo_packages?.category).filter(Boolean)).size}</div>
               <div className="text-sm text-gray-400">Package Categories</div>
             </div>
           </div>
 
           {/* Package Themes List */}
           <div className="bg-gray-800 rounded-lg border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
-              <h3 className="text-lg font-semibold text-white">Package Themes</h3>
-              <p className="text-gray-400 text-sm mt-1">Manage themes for photo packages</p>
+            <div className="p-6 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Package Themes</h3>
+                <p className="text-gray-400 text-sm mt-1">Manage themes for photo packages</p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedPackageTheme(null);
+                  setEditPackageThemeMode(true);
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center"
+              >
+                <Icon path={iconPaths.add} className="w-4 h-4 mr-2" />
+                New Theme
+              </button>
             </div>
             <div className="p-6">
+              {/* Package Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Filter by Package</label>
+                <select
+                  value={selectedPackageFilter}
+                  onChange={(e) => setSelectedPackageFilter(e.target.value)}
+                  className="w-64 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                >
+                  <option value="">All Packages</option>
+                  {(() => {
+                    // Get unique packages for filter
+                    const uniquePackages = packageThemes
+                      .map(t => t.photo_packages)
+                      .filter(Boolean)
+                      .reduce((acc: any[], pkg: any) => {
+                        if (!acc.find(p => p.id === pkg.id)) {
+                          acc.push(pkg);
+                        }
+                        return acc;
+                      }, []);
+                    
+                    return uniquePackages.map((pkg: any) => (
+                      <option key={pkg.id} value={pkg.id}>
+                        {pkg.name}
+                      </option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
               {packageThemes.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <Icon path={iconPaths.palette} className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -506,7 +556,9 @@ const ThemeManagement: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {packageThemes.map((theme) => (
+                  {packageThemes
+                    .filter(theme => !selectedPackageFilter || theme.package_id === selectedPackageFilter)
+                    .map((theme) => (
                     <div
                       key={theme.id}
                       className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-purple-500 transition-colors cursor-pointer"
@@ -1027,8 +1079,8 @@ const ThemeManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Package Theme Edit Modal */}
-      {editPackageThemeMode && (
+      {/* Package Theme Edit Modal - only show when in packages tab */}
+      {editPackageThemeMode && activeTab === 'packages' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 space-y-6">
@@ -1076,11 +1128,24 @@ const ThemeManagement: React.FC = () => {
                         required
                       >
                         <option value="">Select a package</option>
-                        {Array.from(new Set(packageThemes.map(t => t.photo_packages).filter(Boolean))).map((pkg: any) => (
-                          <option key={pkg.id} value={pkg.id}>
-                            {pkg.name} ({pkg.category})
-                          </option>
-                        ))}
+                        {(() => {
+                          // Properly deduplicate packages by ID
+                          const uniquePackages = packageThemes
+                            .map(t => t.photo_packages)
+                            .filter(Boolean)
+                            .reduce((acc: any[], pkg: any) => {
+                              if (!acc.find(p => p.id === pkg.id)) {
+                                acc.push(pkg);
+                              }
+                              return acc;
+                            }, []);
+                          
+                          return uniquePackages.map((pkg: any) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {pkg.name} ({pkg.category})
+                            </option>
+                          ));
+                        })()}
                       </select>
                     </div>
 

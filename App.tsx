@@ -35,8 +35,8 @@ import {
 import EnhancedPromptInput from './components/EnhancedPromptInput';
 import EnhancedImageDisplay from './components/EnhancedImageDisplay';
 import EnhancedComponentErrorBoundary from './components/EnhancedComponentErrorBoundary';
-import PackageSelector from './components/PackageSelector';
-import { PhotoPackagesService, Package, PackageTheme, PackagePricingTier } from './services/photoPackagesService';
+import SimplePackagePicker from './components/SimplePackagePicker';
+import { PhotoPackagesService, Package, PackageTheme } from './services/photoPackagesService';
 import { editImageWithNanoBanana } from './services/geminiService';
 import { secureGeminiService, userIdentificationService } from './services';
 // Enhanced services - with fallback handling
@@ -160,11 +160,9 @@ function App({ navigate }: AppProps) {
   const [migrationStatus, setMigrationStatus] = useState<any>(null);
   const [enhancedSecureGeminiService, setEnhancedSecureGeminiService] = useState<any>(null);
   
-  // Package selection state
-  const [showPackageSelector, setShowPackageSelector] = useState<boolean>(false);
+  // Package selection state - simplified
+  const [showPackagePicker, setShowPackagePicker] = useState<boolean>(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
-  const [selectedPricingTier, setSelectedPricingTier] = useState<PackagePricingTier | null>(null);
-  const [selectedPackageThemes, setSelectedPackageThemes] = useState<PackageTheme[]>([]);
   
   const { isMobile } = useViewport();
   const { isSlowConnection, isOnline } = useNetworkStatus();
@@ -190,32 +188,23 @@ function App({ navigate }: AppProps) {
     }
   };
 
-  // Handle package selection from PackageSelector
-  const handlePackageSelected = (packageData: {
-    package: Package;
-    selectedTier: PackagePricingTier;
-    selectedThemes: PackageTheme[];
-  }) => {
-    setSelectedPackage(packageData.package);
-    setSelectedPricingTier(packageData.selectedTier);
-    setSelectedPackageThemes(packageData.selectedThemes);
-    setShowPackageSelector(false);
+  // Handle package selection - simplified
+  const handlePackageSelected = (selectedPkg: Package) => {
+    setSelectedPackage(selectedPkg);
+    setShowPackagePicker(false);
     
     // Auto-start generation with selected package
-    handlePackageGenerate(packageData);
+    handlePackageGenerate(selectedPkg);
   };
 
-  // Package-based generation handler
-  const handlePackageGenerate = async (packageData?: {
-    package: Package;
-    selectedTier: PackagePricingTier;
-    selectedThemes: PackageTheme[];
-  }) => {
-    const packageToUse = packageData || {
-      package: selectedPackage!,
-      selectedTier: selectedPricingTier!,
-      selectedThemes: selectedPackageThemes
-    };
+  // Package-based generation handler - simplified
+  const handlePackageGenerate = async (packageToUse?: Package) => {
+    const pkg = packageToUse || selectedPackage;
+    
+    if (!pkg) {
+      setError("Please select a photo package first.");
+      return;
+    }
 
     if (!sourceImageFile) {
       setError("Please upload an image first.");
@@ -227,16 +216,319 @@ function App({ navigate }: AppProps) {
       return;
     }
 
-    // Use package themes instead of legacy themes
-    const themesToGenerate = packageToUse.selectedThemes.length > 0 
-      ? packageToUse.selectedThemes 
-      : await PhotoPackagesService.getPackageThemes(packageToUse.package.id);
+    try {
+      // Get all themes for the package and randomly select 3
+      const allThemes = await PhotoPackagesService.getPackageThemes(pkg.id);
+      const shuffledThemes = [...allThemes].sort(() => 0.5 - Math.random());
+      const themesToGenerate = shuffledThemes.slice(0, 3);
 
-    // Convert package themes to the format expected by enhanced generation
-    const themeIds = themesToGenerate.map(theme => theme.id);
+      // Generate with package-specific prompt template based on photo type
+      let packagePromptTemplate = pkg.base_prompt_template;
+      if (photoType === 'single' && pkg.single_prompt_template) {
+        packagePromptTemplate = pkg.single_prompt_template;
+      } else if (photoType === 'couple' && pkg.couple_prompt_template) {
+        packagePromptTemplate = pkg.couple_prompt_template;
+      } else if (photoType === 'family' && pkg.family_prompt_template) {
+        packagePromptTemplate = pkg.family_prompt_template.replace('{family_count}', familyMemberCount.toString());
+      }
+
+      // Call simplified package generation
+      await handleSimplifiedPackageGenerate(themesToGenerate, packagePromptTemplate, pkg);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate with package');
+    }
+  };
+
+  // Simplified package generation handler
+  const handleSimplifiedPackageGenerate = async (
+    themes: PackageTheme[], 
+    basePrompt: string, 
+    packageInfo: Package
+  ) => {
+    console.log('🚀 handleSimplifiedPackageGenerate called with:', {
+      package: packageInfo.name,
+      themes: themes.map(t => t.name),
+      photoType
+    });
+
+    // IMMEDIATE rate limit check for anonymous users
+    if (!user) {
+      console.log('🔒 Anonymous user - checking rate limits immediately');
+      
+      const wasReset = rateLimiter.checkAndAutoReset();
+      if (wasReset) {
+        console.log('✅ Daily limit was auto-reset due to new day');
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: rateLimiter.DISPLAY_LIMIT }
+        }));
+      }
+      
+      if (rateLimiter.isStrictlyAtLimit()) {
+        console.error('🚫 BLOCKED: Anonymous user at daily limit');
+        setShowLimitModal(true);
+        setError(`Daily limit reached: You've used all 3 free photo shoots today. Come back tomorrow for 3 more!`);
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: 0 }
+        }));
+        return;
+      }
+      
+      const limitResult = rateLimiter.consumeCredit();
+      console.log('✅ Anonymous user rate limit check passed, credit consumed proactively');
+      window.dispatchEvent(new CustomEvent('counterUpdate', {
+        detail: { remaining: limitResult.remaining }
+      }));
+    }
+
+    // Initialize user identification service
+    await userIdentificationService.initialize();
     
-    // Call enhanced generation with package themes
-    await handleEnhancedGenerate(themeIds);
+    // Rate limit checks for authenticated users
+    if (user) {
+      const balance = await creditsService.getBalance();
+      if (!balance.canUseCredits) {
+        setShowLimitModal(true);
+        return;
+      }
+      
+      if (balance.paidCredits === 0 && balance.bonusCredits === 0) {
+        console.log('📊 Free tier authenticated user - checking backend rate limits');
+        try {
+          const backendLimit = await secureGeminiService.checkRateLimit();
+          if (!backendLimit.canProceed) {
+            setShowLimitModal(true);
+            setError(`Daily limit reached. Upgrade to premium for unlimited generations!`);
+            return;
+          }
+        } catch (backendError) {
+          console.warn('Backend rate limit check failed for free tier user:', backendError);
+        }
+      } else {
+        console.log('💎 Premium user with paid/bonus credits - skipping rate limits');
+      }
+    } else {
+      try {
+        const backendLimit = await secureGeminiService.checkRateLimit();
+        if (!backendLimit.canProceed) {
+          setShowLimitModal(true);
+          setError(`Server rate limit reached. Please try again later.`);
+          return;
+        }
+      } catch (backendError) {
+        console.warn('Backend rate limit check failed:', backendError);
+      }
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setGeneratedContents(null);
+    
+    // Create enhanced themes for generation
+    const enhancedThemes = themes.map(theme => {
+      // Build full prompt using package base template + theme details
+      const fullPrompt = basePrompt
+        .replace('{setting_prompt}', theme.setting_prompt || '')
+        .replace('{clothing_prompt}', theme.clothing_prompt || '')
+        .replace('{atmosphere_prompt}', theme.atmosphere_prompt || '')
+        .replace('{technical_prompt}', theme.technical_prompt || '');
+
+      return {
+        id: theme.id,
+        name: theme.name,
+        style: theme.name,
+        fullPrompt,
+        packageName: packageInfo.name
+      };
+    });
+    
+    setCurrentStyles(enhancedThemes.map(t => t.name));
+    setSelectedThemes(enhancedThemes);
+    
+    // Initialize progress tracking
+    const initialProgress = enhancedThemes.map(theme => ({
+      style: theme.name,
+      status: 'waiting' as const,
+      theme: theme
+    }));
+    setGenerationProgress(initialProgress);
+
+    const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setCurrentGenerationId(generationId);
+
+    try {
+      // Track generation started with package info
+      posthogService.trackGenerationStarted(generationId, {
+        package: packageInfo.name,
+        packageSlug: packageInfo.slug,
+        styles: enhancedThemes.map(t => t.name),
+        themes: enhancedThemes.map(t => t.id),
+        customPrompt: customPrompt || undefined,
+        generationId,
+        timestamp: Date.now(),
+        photoType
+      });
+      
+      // Track each theme in database analytics
+      await Promise.all(enhancedThemes.map(async (theme) => {
+        return databaseService.trackUsage(generationId, photoType, theme.name);
+      }));
+      
+      console.log(`🎨 Generating ${enhancedThemes.length} styles using package system`);
+      
+      // Use the regular generation system but with package themes
+      const generationResult = await secureGeminiService.generateMultiplePortraits(
+        sourceImageFile,
+        enhancedThemes.map(t => t.name),
+        customPrompt, // User's custom prompt is still applied
+        photoType,
+        familyMemberCount,
+        (style, status) => {
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === style 
+              ? { ...p, status, startTime: status === 'in_progress' ? Date.now() : p.startTime }
+              : p
+          ));
+        }
+      );
+      
+      // Process results (same as original logic)
+      const finalContents: GeneratedContent[] = [];
+      
+      for (const result of generationResult.results) {
+        if (result.success && result.data) {
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === result.style 
+              ? { ...p, status: 'completed' }
+              : p
+          ));
+          
+          posthogService.trackStyleGenerated({
+            style: result.style,
+            generationId,
+            duration: result.processing_time_ms || 0,
+            success: true,
+            package: packageInfo.name
+          });
+          
+          finalContents.push({
+            ...result.data,
+            packageName: packageInfo.name,
+            packageSlug: packageInfo.slug
+          });
+        } else {
+          setGenerationProgress(prev => prev.map(p => 
+            p.style === result.style 
+              ? { ...p, status: 'failed' }
+              : p
+          ));
+          
+          posthogService.trackStyleGenerated({
+            style: result.style,
+            generationId,
+            duration: result.processing_time_ms || 0,
+            success: false,
+            error: result.error || 'Unknown error',
+            package: packageInfo.name
+          });
+          
+          finalContents.push({
+            imageUrl: null,
+            text: result.error || 'Generation failed',
+            style: result.style,
+            packageName: packageInfo.name,
+            packageSlug: packageInfo.slug
+          });
+        }
+      }
+      
+      // Handle remaining logic (same as original)
+      if (user && generationResult.successful > 0) {
+        const consumeResult = await creditsService.consumeCredit(`${packageInfo.name} generation - ${photoType}`);
+        if (!consumeResult.success) {
+          console.warn('Failed to consume credit after generation:', consumeResult.error);
+        }
+      }
+      
+      // Anonymous user failure handling
+      if (!user && generationResult.successful === 0) {
+        const hasRateLimitError = generationResult.results.some(result => 
+          result.error && (
+            result.error.includes('Daily limit') || 
+            result.error.includes('rate limit') ||
+            result.error.includes('Rate limit')
+          )
+        );
+        
+        if (hasRateLimitError) {
+          console.log('🔄 All generations failed due to rate limiting - showing limit modal');
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: 0 }
+          }));
+          setShowLimitModal(true);
+          setIsLoading(false);
+          return;
+        } else {
+          console.log('🔄 All generations failed (not rate limit) - restoring credit');
+          const restored = rateLimiter.restoreCredit();
+          window.dispatchEvent(new CustomEvent('counterUpdate', {
+            detail: { remaining: restored.remaining }
+          }));
+        }
+      }
+      
+      setGeneratedContents(finalContents);
+      
+      // Track generation completed
+      const successfulStyles = finalContents.filter(c => c.imageUrl !== null).map(c => c.style);
+      const failedStyles = finalContents.filter(c => c.imageUrl === null).map(c => c.style);
+      posthogService.trackGenerationCompleted(generationId, successfulStyles, failedStyles);
+      
+      // Increment counter
+      incrementCounterWithMetadata(
+        generationId,
+        successfulStyles.length,
+        enhancedThemes.length,
+        photoType,
+        enhancedThemes.map(t => t.name),
+        customPrompt
+      );
+      
+      // Handle error messages
+      if (failedStyles.length > 0) {
+        const hasRateLimitError = finalContents.some(c => 
+          c.imageUrl === null && 
+          (c.text?.includes('quota') || c.text?.includes('limit') || c.text?.includes('Rate limit') || c.text?.includes('popular today'))
+        );
+        
+        if (successfulStyles.length === 0) {
+          if (hasRateLimitError) {
+            setError(`Generation failed: Daily API limits reached. Please try again tomorrow when limits reset at midnight PT.`);
+          } else {
+            setError(`Generation failed: All ${packageInfo.name} styles encountered issues. Please try with a different photo or check your internet connection.`);
+          }
+        } else if (hasRateLimitError) {
+          setError(`Some ${packageInfo.name} styles hit rate limits, but ${successfulStyles.length} succeeded! 🎆`);
+        } else {
+          setError(`${successfulStyles.length} ${packageInfo.name} portraits are ready! ${failedStyles.length} styles encountered issues - try adjusting your prompt or photo. ✨`);
+        }
+      }
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred during package generation.";
+      posthogService.trackGenerationFailed(generationId, errorMessage);
+      
+      if (!user) {
+        console.log('🔄 Restoring credit for anonymous user due to generation error');
+        const restored = rateLimiter.restoreCredit();
+        window.dispatchEvent(new CustomEvent('counterUpdate', {
+          detail: { remaining: restored.remaining }
+        }));
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Enhanced generation handler with theme support
@@ -1247,33 +1539,65 @@ function App({ navigate }: AppProps) {
             sourceImageUrl={sourceImageUrl} 
           />
 
-          {sourceImageUrl && !showPackageSelector && (
+          {sourceImageUrl && !showPackagePicker && (
             <div className="flex flex-col items-center space-y-4">
               <button
-                onClick={() => setShowPackageSelector(true)}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                onClick={() => setShowPackagePicker(true)}
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg"
               >
                 🎨 Choose Photo Package
               </button>
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                Or scroll down to use the quick generation mode
+                Select from Wedding, Engagement, Professional, or Anniversary styles
               </p>
             </div>
           )}
 
-          {showPackageSelector && sourceImageUrl && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-              <PackageSelector
-                onPackageSelected={handlePackageSelected}
-                isLoading={isLoading}
-              />
-            </div>
+          {showPackagePicker && sourceImageUrl && (
+            <SimplePackagePicker
+              onPackageSelected={handlePackageSelected}
+              className="mb-6"
+            />
           )}
 
-          {sourceImageUrl && !showPackageSelector && (
-            <div>
+          {sourceImageUrl && !showPackagePicker && selectedPackage && (
+            <div className="space-y-6">
+              {/* Package Selection Status */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-lg">
+                        {selectedPackage.slug === 'wedding-portraits' && '💍'}
+                        {selectedPackage.slug === 'engagement-portraits' && '💕'}
+                        {selectedPackage.slug === 'professional-headshots' && '👔'}
+                        {selectedPackage.slug === 'anniversary-photos' && '🥂'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{selectedPackage.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">3 random themes • Ready to generate</p>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setShowPackagePicker(true)}
+                      className="px-3 py-1 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-800 rounded transition-colors"
+                    >
+                      Change
+                    </button>
+                    <button
+                      onClick={() => handlePackageGenerate()}
+                      disabled={isLoading}
+                      className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      {isLoading ? 'Generating...' : 'Start Photo Shoot'}
+                    </button>
+                  </div>
+                </div>
+              </div>
               
-              {/* Use Enhanced or Legacy Prompt Input */}
+              {/* Optional Custom Prompt Input */}
               {useEnhancedComponents && enhancedSystemReady ? (
                 <EnhancedComponentErrorBoundary
                   componentName="EnhancedPromptInput"
