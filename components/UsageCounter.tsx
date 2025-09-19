@@ -19,32 +19,69 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
   const [limitInfo, setLimitInfo] = useState<RateLimitResult | null>(null);
   const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const [timeUntilReset, setTimeUntilReset] = useState<string>('');
+  const [hasConnectionError, setHasConnectionError] = useState<boolean>(false);
 
   const updateUsageInfo = async () => {
     if (user) {
-      // For authenticated users, get credit balance
-      const balance = await creditsService.getBalance();
-      setCreditBalance(balance);
-      setLimitInfo(null);
-      
-      if (showTimeUntilReset) {
-        setTimeUntilReset(creditsService.getTimeUntilReset());
+      // For authenticated users, get credit balance with error handling
+      try {
+        const balance = await creditsService.getBalance();
+        setCreditBalance(balance);
+        setLimitInfo(null);
+        setHasConnectionError(false); // Clear any previous connection errors
+        
+        if (showTimeUntilReset) {
+          setTimeUntilReset(creditsService.getTimeUntilReset());
+        }
+      } catch (error) {
+        console.warn('UsageCounter: Failed to get credit balance, using fallback:', error);
+        setHasConnectionError(true); // Mark that we have a connection issue
+        
+        // Set a safe fallback state that doesn't break the UI
+        const fallbackBalance = {
+          freeCreditsUsed: 0,
+          freeCreditsRemaining: 0,
+          paidCredits: 0,
+          bonusCredits: 0,
+          totalAvailable: 0,
+          canUseCredits: false
+        };
+        setCreditBalance(fallbackBalance);
+        setLimitInfo(null);
+        
+        if (showTimeUntilReset) {
+          setTimeUntilReset(creditsService.getTimeUntilReset());
+        }
       }
     } else {
       // For anonymous users, force a fresh check and auto-reset if needed
-      const wasReset = rateLimiter.checkAndAutoReset();
-      if (wasReset) {
-        console.log('UsageCounter: Daily limit was auto-reset due to new day');
-      }
-      
-      // Get fresh rate limiter data
-      const info = rateLimiter.checkLimit();
-      console.log('UsageCounter: Rate limiter info updated:', info);
-      setLimitInfo(info);
-      setCreditBalance(null);
-      
-      if (showTimeUntilReset) {
-        setTimeUntilReset(rateLimiter.getTimeUntilReset());
+      try {
+        const wasReset = rateLimiter.checkAndAutoReset();
+        if (wasReset) {
+          console.log('UsageCounter: Daily limit was auto-reset due to new day');
+        }
+        
+        // Get fresh rate limiter data
+        const info = rateLimiter.checkLimit();
+        console.log('UsageCounter: Rate limiter info updated:', info);
+        setLimitInfo(info);
+        setCreditBalance(null);
+        
+        if (showTimeUntilReset) {
+          setTimeUntilReset(rateLimiter.getTimeUntilReset());
+        }
+      } catch (error) {
+        console.warn('UsageCounter: Failed to update rate limiter info:', error);
+        // Rate limiter should be more stable, but add fallback just in case
+        const fallbackInfo = {
+          remaining: 0,
+          total: 3,
+          used: 3,
+          canUse: false,
+          resetTime: new Date()
+        };
+        setLimitInfo(fallbackInfo);
+        setCreditBalance(null);
       }
     }
   };
@@ -210,6 +247,19 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
         </div>
       </div>
 
+      {/* Connection Error Warning */}
+      {hasConnectionError && isAuthenticated && (
+        <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-800 dark:text-amber-200">
+          <div className="flex items-center gap-1">
+            <Icon 
+              path="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" 
+              className="w-3 h-3" 
+            />
+            Connection issue - showing cached data
+          </div>
+        </div>
+      )}
+
       {/* Status Message */}
       <div className="text-sm text-gray-600 dark:text-gray-400">
         {isAuthenticated ? (
@@ -227,7 +277,10 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
             </div>
           ) : (
             <span>
-              No photo shoots remaining. Get a photo pack to continue creating amazing portraits!
+              {hasConnectionError ? 
+                'Unable to load credit balance - please check your connection and try again.' :
+                'No photo shoots remaining. Get a photo pack to continue creating amazing portraits!'
+              }
             </span>
           )
         ) : (
