@@ -7,7 +7,7 @@ import PasswordResetPage from './PasswordResetPage';
 import AdminDashboard from '../src/components/admin/AdminDashboard';
 import AdminProtectedRoute from '../src/components/admin/AdminProtectedRoute';
 
-type Route = 'home' | 'privacy' | 'terms' | 'success' | 'reset-password' | 'admin' | 'admin/users' | 'admin/alerts';
+type Route = 'home' | 'privacy' | 'terms' | 'success' | 'reset-password' | 'admin' | 'admin/users' | 'admin/alerts' | 'admin/packages' | 'admin/themes' | 'admin/prompts' | 'admin/credits';
 
 const Router: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('home');
@@ -42,6 +42,18 @@ const Router: React.FC = () => {
       } else if (window.location.pathname === '/admin/alerts') {
         setCurrentRoute('admin/alerts');
         return;
+      } else if (window.location.pathname === '/admin/packages') {
+        setCurrentRoute('admin/packages');
+        return;
+      } else if (window.location.pathname === '/admin/themes') {
+        setCurrentRoute('admin/themes');
+        return;
+      } else if (window.location.pathname === '/admin/prompts') {
+        setCurrentRoute('admin/prompts');
+        return;
+      } else if (window.location.pathname === '/admin/credits') {
+        setCurrentRoute('admin/credits');
+        return;
       }
       
       switch (hash) {
@@ -66,6 +78,18 @@ const Router: React.FC = () => {
           break;
         case 'admin/alerts':
           setCurrentRoute('admin/alerts');
+          break;
+        case 'admin/packages':
+          setCurrentRoute('admin/packages');
+          break;
+        case 'admin/themes':
+          setCurrentRoute('admin/themes');
+          break;
+        case 'admin/prompts':
+          setCurrentRoute('admin/prompts');
+          break;
+        case 'admin/credits':
+          setCurrentRoute('admin/credits');
           break;
         default:
           setCurrentRoute('home');

@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { PhotoPackagesService, Package, PackageTheme, PackagePricingTier } from '../../../services/photoPackagesService';
 import LoadingSpinner from '../../components/admin/LoadingSpinner';
 import AlertNotification from '../../components/admin/AlertNotification';
+import Icon from '../../../components/Icon';
+import SearchInput from '../../components/admin/SearchInput';
+
+// Icon paths for consistency with other admin pages
+const iconPaths = {
+  plus: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z",
+  edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  trash: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+  search: "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+  refreshCw: "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
+  package: "M12 2l3.09 1.26L12 6L8.91 3.26L12 2zm4.65 1.82L21 8.5l-5 2.18-2.35-1.32 1.65-.96L21 8.5zm-9.3 0L12 8.5 8.65 9.86 12 8.5zM7.35 3.82L12 6l4.65-2.18L12 6zM2 12l3.09-1.26L2 8l3.09-1.26L2 8zm0 0l3.09 1.26L2 16l3.09 1.26L2 16zm10 10l-3.09-1.26L12 18l3.09 1.26L12 20zm4.65-1.82L12 15.5l-4.65 2.68L12 15.5zM21 16l-3.09-1.26L21 12l-3.09-1.26L21 12z"
+};
 
 interface PackageManagementProps {
   className?: string;
@@ -22,6 +34,7 @@ export default function PackageManagement({ className = '' }: PackageManagementP
   const [editingTheme, setEditingTheme] = useState<Partial<PackageTheme>>({});
   const [isEditingPricingTier, setIsEditingPricingTier] = useState(false);
   const [editingPricingTier, setEditingPricingTier] = useState<Partial<PackagePricingTier>>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Load initial data
   useEffect(() => {
@@ -207,6 +220,13 @@ export default function PackageManagement({ className = '' }: PackageManagementP
     return PhotoPackagesService.formatPackagePrice(priceCents, currency);
   };
 
+  // Filter packages based on search term
+  const filteredPackages = packages.filter(pkg =>
+    pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    pkg.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    pkg.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading && packages.length === 0) {
     return (
       <div className={`flex justify-center items-center py-8 ${className}`}>
@@ -216,29 +236,58 @@ export default function PackageManagement({ className = '' }: PackageManagementP
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Package Management
-        </h1>
-        <button
-          onClick={() => {
-            setEditingPackage({
-              name: '',
-              description: '',
-              category: 'wedding',
-              images_per_generation: 3,
-              base_prompt_template: '',
-              is_active: true,
-              is_featured: false,
-              sort_order: 0
-            });
-            setIsEditingPackage(true);
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Create New Package
-        </button>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Package Management</h1>
+          <p className="text-gray-400 mt-2">Manage photo packages, themes, and pricing tiers</p>
+        </div>
+        <div className="mt-4 md:mt-0 flex space-x-2">
+          <button
+            onClick={loadPackages}
+            disabled={loading}
+            className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center disabled:opacity-50"
+          >
+            <Icon path={iconPaths.refreshCw} className="w-5 h-5 mr-2" />
+            Refresh
+          </button>
+          <button
+            onClick={() => {
+              setEditingPackage({
+                name: '',
+                description: '',
+                category: 'wedding',
+                images_per_generation: 3,
+                base_prompt_template: '',
+                is_active: true,
+                is_featured: false,
+                sort_order: 0
+              });
+              setIsEditingPackage(true);
+            }}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center"
+          >
+            <Icon path={iconPaths.plus} className="w-5 h-5 mr-2" />
+            Create Package
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <div className="flex-1 max-w-md">
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Search packages..."
+          />
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-gray-400 text-sm">
+            {filteredPackages.length} of {packages.length} packages
+          </span>
+        </div>
       </div>
 
       {error && (
@@ -257,52 +306,66 @@ export default function PackageManagement({ className = '' }: PackageManagementP
         />
       )}
 
+      {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Package List */}
         <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Packages</h3>
+          <div className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-4 border-b border-gray-700">
+              <h3 className="font-semibold text-white flex items-center">
+                <Icon path={iconPaths.package} className="w-5 h-5 mr-2" />
+                Packages ({filteredPackages.length})
+              </h3>
             </div>
             <div className="p-4">
-              <div className="space-y-2">
-                {packages.map((pkg) => (
-                  <button
-                    key={pkg.id}
-                    onClick={() => setSelectedPackage(pkg)}
-                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                      selectedPackage?.id === pkg.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white">
-                          {pkg.name}
-                        </h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                          {pkg.category}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {pkg.is_featured && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                            Featured
+              {filteredPackages.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <Icon path={iconPaths.package} className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No packages found</p>
+                  {searchTerm && (
+                    <p className="text-sm mt-1">Try adjusting your search</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredPackages.map((pkg) => (
+                    <button
+                      key={pkg.id}
+                      onClick={() => setSelectedPackage(pkg)}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                        selectedPackage?.id === pkg.id
+                          ? 'border-purple-500 bg-purple-900/20'
+                          : 'border-gray-600 hover:border-gray-500 hover:bg-gray-700/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-white truncate">
+                            {pkg.name}
+                          </h4>
+                          <p className="text-sm text-gray-400 capitalize">
+                            {pkg.category} • {pkg.images_per_generation} images
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-1 ml-2">
+                          {pkg.is_featured && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-900 text-yellow-300 border border-yellow-700">
+                              Featured
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${
+                            pkg.is_active 
+                              ? 'bg-green-900 text-green-300 border-green-700' 
+                              : 'bg-red-900 text-red-300 border-red-700'
+                          }`}>
+                            {pkg.is_active ? 'Active' : 'Inactive'}
                           </span>
-                        )}
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                          pkg.is_active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {pkg.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                        </div>
                       </div>
-                    </div>
                   </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -312,10 +375,10 @@ export default function PackageManagement({ className = '' }: PackageManagementP
           {selectedPackage ? (
             <div className="space-y-6">
               {/* Package Info */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="bg-gray-800 rounded-lg border border-gray-700">
+                <div className="p-4 border-b border-gray-700">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                    <h3 className="font-semibold text-white">
                       {selectedPackage.name}
                     </h3>
                     <div className="flex space-x-2">
@@ -324,14 +387,16 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                           setEditingPackage(selectedPackage);
                           setIsEditingPackage(true);
                         }}
-                        className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        className="px-3 py-1 text-sm bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors flex items-center"
                       >
+                        <Icon path={iconPaths.edit} className="w-4 h-4 mr-1" />
                         Edit
                       </button>
                       <button
                         onClick={() => handleDeletePackage(selectedPackage.id)}
-                        className="px-3 py-1 text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                        className="px-3 py-1 text-sm bg-red-900 text-red-300 rounded hover:bg-red-800 transition-colors flex items-center"
                       >
+                        <Icon path={iconPaths.trash} className="w-4 h-4 mr-1" />
                         Delete
                       </button>
                     </div>
@@ -340,41 +405,41 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                 <div className="p-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Category:</span>
-                      <span className="ml-2 capitalize">{selectedPackage.category}</span>
+                      <span className="text-gray-400">Category:</span>
+                      <span className="ml-2 capitalize text-white">{selectedPackage.category}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Images per generation:</span>
-                      <span className="ml-2">{selectedPackage.images_per_generation}</span>
+                      <span className="text-gray-400">Images per generation:</span>
+                      <span className="ml-2 text-white">{selectedPackage.images_per_generation}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Active:</span>
-                      <span className="ml-2">{selectedPackage.is_active ? 'Yes' : 'No'}</span>
+                      <span className="text-gray-400">Active:</span>
+                      <span className="ml-2 text-white">{selectedPackage.is_active ? 'Yes' : 'No'}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Featured:</span>
-                      <span className="ml-2">{selectedPackage.is_featured ? 'Yes' : 'No'}</span>
+                      <span className="text-gray-400">Featured:</span>
+                      <span className="ml-2 text-white">{selectedPackage.is_featured ? 'Yes' : 'No'}</span>
                     </div>
                   </div>
                   {selectedPackage.description && (
                     <div className="mt-4">
-                      <span className="text-gray-500 dark:text-gray-400">Description:</span>
-                      <p className="mt-1 text-gray-900 dark:text-white">{selectedPackage.description}</p>
+                      <span className="text-gray-400">Description:</span>
+                      <p className="mt-1 text-white">{selectedPackage.description}</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-                <div className="border-b border-gray-200 dark:border-gray-700">
+              <div className="bg-gray-800 rounded-lg border border-gray-700">
+                <div className="border-b border-gray-700">
                   <nav className="-mb-px flex">
                     <button
                       onClick={() => setActiveTab('themes')}
                       className={`py-2 px-4 border-b-2 font-medium text-sm ${
                         activeTab === 'themes'
-                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                          ? 'border-purple-500 text-purple-400'
+                          : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
                       }`}
                     >
                       Themes ({packageThemes.length})
@@ -383,8 +448,8 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                       onClick={() => setActiveTab('pricing')}
                       className={`py-2 px-4 border-b-2 font-medium text-sm ${
                         activeTab === 'pricing'
-                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                          ? 'border-purple-500 text-purple-400'
+                          : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
                       }`}
                     >
                       Pricing ({pricingTiers.length})
@@ -396,7 +461,7 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                   {activeTab === 'themes' && (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <h4 className="font-medium text-gray-900 dark:text-white">
+                        <h4 className="font-medium text-white">
                           Package Themes
                         </h4>
                         <button
@@ -412,8 +477,9 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                             });
                             setIsEditingTheme(true);
                           }}
-                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center"
                         >
+                          <Icon path={iconPaths.plus} className="w-4 h-4 mr-1" />
                           Add Theme
                         </button>
                       </div>
@@ -422,29 +488,29 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                         {packageThemes.map((theme) => (
                           <div
                             key={theme.id}
-                            className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                            className="p-3 border border-gray-600 rounded-lg bg-gray-700/50"
                           >
                             <div className="flex items-center justify-between">
                               <div>
-                                <h5 className="font-medium text-gray-900 dark:text-white">
+                                <h5 className="font-medium text-white">
                                   {theme.name}
                                 </h5>
                                 {theme.description && (
-                                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                  <p className="text-sm text-gray-400 mt-1">
                                     {theme.description}
                                   </p>
                                 )}
                               </div>
                               <div className="flex items-center space-x-2">
                                 {theme.is_premium && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-900 text-yellow-300 border border-yellow-700">
                                     Premium
                                   </span>
                                 )}
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${
                                   theme.is_active 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-900 text-green-300 border-green-700' 
+                                    : 'bg-red-900 text-red-300 border-red-700'
                                 }`}>
                                   {theme.is_active ? 'Active' : 'Inactive'}
                                 </span>
@@ -454,13 +520,13 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                                       setEditingTheme(theme);
                                       setIsEditingTheme(true);
                                     }}
-                                    className="text-blue-600 hover:text-blue-700 text-sm"
+                                    className="text-purple-400 hover:text-purple-300 text-sm"
                                   >
                                     Edit
                                   </button>
                                   <button
                                     onClick={() => handleDeleteTheme(theme.id)}
-                                    className="text-red-600 hover:text-red-700 text-sm"
+                                    className="text-red-400 hover:text-red-300 text-sm"
                                   >
                                     Delete
                                   </button>
@@ -476,7 +542,7 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                   {activeTab === 'pricing' && (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <h4 className="font-medium text-gray-900 dark:text-white">
+                        <h4 className="font-medium text-white">
                           Pricing Tiers
                         </h4>
                         <button
@@ -494,8 +560,9 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                             });
                             setIsEditingPricingTier(true);
                           }}
-                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center"
                         >
+                          <Icon path={iconPaths.plus} className="w-4 h-4 mr-1" />
                           Add Tier
                         </button>
                       </div>
@@ -504,32 +571,32 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                         {pricingTiers.map((tier) => (
                           <div
                             key={tier.id}
-                            className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                            className="p-3 border border-gray-600 rounded-lg bg-gray-700/50"
                           >
                             <div className="flex items-center justify-between">
                               <div>
-                                <h5 className="font-medium text-gray-900 dark:text-white">
+                                <h5 className="font-medium text-white">
                                   {tier.display_name}
                                   {tier.badge && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-900 text-purple-300 border border-purple-700">
                                       {tier.badge}
                                     </span>
                                   )}
                                 </h5>
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                <div className="text-sm text-gray-400 mt-1">
                                   {formatPrice(tier.price_amount_cents, tier.currency)} • {tier.included_generations} generations
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
                                 {tier.is_default && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-900 text-green-300 border border-green-700">
                                     Default
                                   </span>
                                 )}
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${
                                   tier.is_active 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-900 text-green-300 border-green-700' 
+                                    : 'bg-red-900 text-red-300 border-red-700'
                                 }`}>
                                   {tier.is_active ? 'Active' : 'Inactive'}
                                 </span>
@@ -539,13 +606,13 @@ export default function PackageManagement({ className = '' }: PackageManagementP
                                       setEditingPricingTier(tier);
                                       setIsEditingPricingTier(true);
                                     }}
-                                    className="text-blue-600 hover:text-blue-700 text-sm"
+                                    className="text-purple-400 hover:text-purple-300 text-sm"
                                   >
                                     Edit
                                   </button>
                                   <button
                                     onClick={() => handleDeletePricingTier(tier.id)}
-                                    className="text-red-600 hover:text-red-700 text-sm"
+                                    className="text-red-400 hover:text-red-300 text-sm"
                                   >
                                     Delete
                                   </button>
@@ -561,8 +628,8 @@ export default function PackageManagement({ className = '' }: PackageManagementP
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-8 text-center">
-              <p className="text-gray-500 dark:text-gray-400">
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-8 text-center">
+              <p className="text-gray-400">
                 Select a package from the list to view its details and manage themes and pricing.
               </p>
             </div>

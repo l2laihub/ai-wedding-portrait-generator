@@ -595,6 +595,59 @@ const PromptManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Package Themes Integration Info */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-white flex items-center">
+              <Icon path={iconPaths.copy} className="w-5 h-5 mr-2" />
+              Package Themes Integration
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Package themes automatically integrate with these prompt templates using the {`{style}`} variable
+            </p>
+            
+            <div className="mt-3 p-3 bg-gray-700/50 rounded-lg">
+              <p className="text-xs text-gray-300 mb-2"><strong>How it works:</strong></p>
+              <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+                <li>Package themes provide structured prompts (setting, clothing, atmosphere, technical)</li>
+                <li>The base prompt template includes the {`{style}`} placeholder</li>
+                <li>During generation, the system combines the base template with selected package theme prompts</li>
+                <li>Result: "Professional portrait photography... [setting_prompt], [clothing_prompt], [atmosphere_prompt], [technical_prompt]"</li>
+              </ol>
+            </div>
+            
+            <div className="mt-3 flex items-center space-x-4 text-sm">
+              <button 
+                onClick={() => {
+                  window.history.pushState(null, '', '/admin/packages');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+                className="text-purple-400 hover:text-purple-300 underline cursor-pointer"
+              >
+                Manage Package Themes →
+              </button>
+              <button 
+                onClick={() => {
+                  window.history.pushState(null, '', '/admin/themes');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+                className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                View in Theme Management →
+              </button>
+            </div>
+          </div>
+          
+          <div className="text-right">
+            <div className="text-2xl font-bold text-purple-400">12</div>
+            <div className="text-xs text-gray-400">Wedding Themes</div>
+            <div className="text-2xl font-bold text-blue-400 mt-2">12</div>
+            <div className="text-xs text-gray-400">Engagement Themes</div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Prompt List */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">

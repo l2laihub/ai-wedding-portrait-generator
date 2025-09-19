@@ -61,11 +61,15 @@ const ThemeManagement: React.FC = () => {
     featured: ''
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'themes' | 'stats'>('themes');
+  const [activeTab, setActiveTab] = useState<'themes' | 'packages' | 'stats'>('themes');
+  const [packageThemes, setPackageThemes] = useState<any[]>([]);
+  const [selectedPackageTheme, setSelectedPackageTheme] = useState<any | null>(null);
+  const [editPackageThemeMode, setEditPackageThemeMode] = useState(false);
 
   useEffect(() => {
     loadStyles();
     loadStats();
+    loadPackageThemes();
   }, []);
 
   const loadStyles = async () => {
@@ -140,6 +144,104 @@ const ThemeManagement: React.FC = () => {
         cache_entries: 0,
         cache_hit_rate: 0
       });
+    }
+  };
+
+  const loadPackageThemes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('package_themes')
+        .select(`
+          *,
+          photo_packages!inner (
+            id,
+            name,
+            slug,
+            category
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Failed to load package themes:', error);
+        setPackageThemes([]);
+        return;
+      }
+      
+      setPackageThemes(data || []);
+    } catch (error: any) {
+      console.error('Failed to load package themes:', error);
+      setPackageThemes([]);
+    }
+  };
+
+  const savePackageTheme = async (themeData: any) => {
+    setLoading(true);
+    try {
+      if (selectedPackageTheme?.id) {
+        // Update existing theme
+        const { data, error } = await supabase
+          .from('package_themes')
+          .update(themeData)
+          .eq('id', selectedPackageTheme.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Update local state
+        setPackageThemes(prev => 
+          prev.map(theme => theme.id === selectedPackageTheme.id ? { ...theme, ...data } : theme)
+        );
+        setSuccess('Package theme updated successfully');
+      } else {
+        // Create new theme
+        const { data, error } = await supabase
+          .from('package_themes')
+          .insert(themeData)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Add to local state
+        setPackageThemes(prev => [data, ...prev]);
+        setSuccess('Package theme created successfully');
+      }
+      
+      setEditPackageThemeMode(false);
+      setSelectedPackageTheme(null);
+    } catch (error: any) {
+      console.error('Failed to save package theme:', error);
+      setError('Failed to save package theme: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deletePackageTheme = async (themeId: string) => {
+    if (!confirm('Are you sure you want to delete this package theme?')) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('package_themes')
+        .delete()
+        .eq('id', themeId);
+      
+      if (error) throw error;
+      
+      setPackageThemes(prev => prev.filter(theme => theme.id !== themeId));
+      setSuccess('Package theme deleted successfully');
+      
+      if (selectedPackageTheme?.id === themeId) {
+        setSelectedPackageTheme(null);
+      }
+    } catch (error: any) {
+      console.error('Failed to delete package theme:', error);
+      setError('Failed to delete package theme: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -288,7 +390,17 @@ const ThemeManagement: React.FC = () => {
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              Themes
+              Legacy Themes
+            </button>
+            <button
+              onClick={() => setActiveTab('packages')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'packages'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Package Themes
             </button>
             <button
               onClick={() => setActiveTab('stats')}
@@ -308,6 +420,18 @@ const ThemeManagement: React.FC = () => {
             >
               <Icon path={iconPaths.add} className="w-4 h-4 mr-2" />
               Create Style
+            </button>
+          )}
+          {activeTab === 'packages' && (
+            <button
+              onClick={() => {
+                setSelectedPackageTheme(null);
+                setEditPackageThemeMode(true);
+              }}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm flex items-center"
+            >
+              <Icon path={iconPaths.add} className="w-4 h-4 mr-2" />
+              Create Package Theme
             </button>
           )}
         </div>
@@ -345,9 +469,97 @@ const ThemeManagement: React.FC = () => {
       {/* Tab Content */}
       {activeTab === 'stats' ? (
         <TemplateEngineStats />
+      ) : activeTab === 'packages' ? (
+        <div className="space-y-6">
+          {/* Package Themes Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="text-2xl font-bold text-purple-400">{packageThemes.length}</div>
+              <div className="text-sm text-gray-400">Total Package Themes</div>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="text-2xl font-bold text-blue-400">{packageThemes.filter(t => t.is_active).length}</div>
+              <div className="text-sm text-gray-400">Active Themes</div>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="text-2xl font-bold text-yellow-400">{packageThemes.filter(t => t.is_premium).length}</div>
+              <div className="text-sm text-gray-400">Premium Themes</div>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="text-2xl font-bold text-green-400">{Array.from(new Set(packageThemes.map(t => t.photo_packages?.category))).length}</div>
+              <div className="text-sm text-gray-400">Package Categories</div>
+            </div>
+          </div>
+
+          {/* Package Themes List */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-6 border-b border-gray-700">
+              <h3 className="text-lg font-semibold text-white">Package Themes</h3>
+              <p className="text-gray-400 text-sm mt-1">Manage themes for photo packages</p>
+            </div>
+            <div className="p-6">
+              {packageThemes.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <Icon path={iconPaths.palette} className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No package themes found</p>
+                  <p className="text-sm mt-1">Create your first package theme to get started</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {packageThemes.map((theme) => (
+                    <div
+                      key={theme.id}
+                      className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-purple-500 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedPackageTheme(theme);
+                        setEditPackageThemeMode(true);
+                      }}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium text-white">{theme.name}</h4>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {theme.photo_packages?.name} • {theme.photo_packages?.category}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {theme.is_premium && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-900 text-yellow-300 border border-yellow-700">
+                              Premium
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${
+                            theme.is_active 
+                              ? 'bg-green-900 text-green-300 border-green-700' 
+                              : 'bg-red-900 text-red-300 border-red-700'
+                          }`}>
+                            {theme.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-3 line-clamp-2">{theme.description}</p>
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span>Popularity: {theme.popularity_score}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deletePackageTheme(theme.id);
+                          }}
+                          className="text-red-400 hover:text-red-300 p-1"
+                        >
+                          <Icon path={iconPaths.delete} className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
-          {/* Stats Cards */}
+          {/* Legacy Themes Stats Cards */}
           {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -810,6 +1022,194 @@ const ThemeManagement: React.FC = () => {
                   {loading ? 'Saving...' : (selectedStyle ? 'Update Style' : 'Create Style')}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Package Theme Edit Modal */}
+      {editPackageThemeMode && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-white">
+                  {selectedPackageTheme ? 'Edit Package Theme' : 'Create New Package Theme'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setEditPackageThemeMode(false);
+                    setSelectedPackageTheme(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-300"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const themeData = {
+                  package_id: formData.get('package_id'),
+                  name: formData.get('name'),
+                  description: formData.get('description'),
+                  setting_prompt: formData.get('setting_prompt'),
+                  clothing_prompt: formData.get('clothing_prompt'),
+                  atmosphere_prompt: formData.get('atmosphere_prompt'),
+                  technical_prompt: formData.get('technical_prompt'),
+                  is_active: formData.get('is_active') === 'on',
+                  is_premium: formData.get('is_premium') === 'on',
+                  popularity_score: parseInt(formData.get('popularity_score') as string) || 0,
+                };
+                savePackageTheme(themeData);
+              }}>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Package *</label>
+                      <select
+                        name="package_id"
+                        defaultValue={selectedPackageTheme?.package_id || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        required
+                      >
+                        <option value="">Select a package</option>
+                        {Array.from(new Set(packageThemes.map(t => t.photo_packages).filter(Boolean))).map((pkg: any) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.name} ({pkg.category})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                      <input
+                        type="text"
+                        name="name"
+                        defaultValue={selectedPackageTheme?.name || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        placeholder="e.g., Classic Romance"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                      <textarea
+                        name="description"
+                        defaultValue={selectedPackageTheme?.description || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        rows={3}
+                        placeholder="Brief description of the theme"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Popularity Score</label>
+                        <input
+                          type="number"
+                          name="popularity_score"
+                          defaultValue={selectedPackageTheme?.popularity_score || 5}
+                          min="0"
+                          max="10"
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            name="is_active"
+                            defaultChecked={selectedPackageTheme?.is_active ?? true}
+                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-300">Active</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            name="is_premium"
+                            defaultChecked={selectedPackageTheme?.is_premium ?? false}
+                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-300">Premium</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Setting Prompt</label>
+                      <textarea
+                        name="setting_prompt"
+                        defaultValue={selectedPackageTheme?.setting_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={4}
+                        placeholder="Describe the setting and environment..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Clothing Prompt</label>
+                      <textarea
+                        name="clothing_prompt"
+                        defaultValue={selectedPackageTheme?.clothing_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={4}
+                        placeholder="Describe the attire and styling..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Atmosphere Prompt</label>
+                      <textarea
+                        name="atmosphere_prompt"
+                        defaultValue={selectedPackageTheme?.atmosphere_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={3}
+                        placeholder="Describe the mood and feeling..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Technical Prompt</label>
+                      <textarea
+                        name="technical_prompt"
+                        defaultValue={selectedPackageTheme?.technical_prompt || ''}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                        rows={3}
+                        placeholder="Describe technical photography aspects..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditPackageThemeMode(false);
+                      setSelectedPackageTheme(null);
+                    }}
+                    className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    <Icon path={iconPaths.save} className="w-4 h-4 mr-2" />
+                    {loading ? 'Saving...' : (selectedPackageTheme ? 'Update Theme' : 'Create Theme')}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

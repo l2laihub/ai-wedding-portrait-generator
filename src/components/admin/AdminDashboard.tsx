@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayoutSimple from './AdminLayoutSimple';
 import DashboardSimple from '../../pages/admin/DashboardSimple';
 import UserManagement from '../../pages/admin/UserManagement';
@@ -11,7 +11,43 @@ import PackageManagement from '../../pages/admin/PackageManagement';
 type AdminRoute = 'dashboard' | 'users' | 'alerts' | 'generations' | 'credits' | 'packages' | 'prompts' | 'themes' | 'activity' | 'settings';
 
 const AdminDashboard: React.FC = () => {
-  const [currentRoute, setCurrentRoute] = useState<AdminRoute>('dashboard');
+  const [currentRoute, setCurrentRoute] = useState<AdminRoute>(() => {
+    // Initialize route based on current URL
+    const path = window.location.pathname;
+    if (path === '/admin/packages') return 'packages';
+    if (path === '/admin/themes') return 'themes';
+    if (path === '/admin/prompts') return 'prompts';
+    if (path === '/admin/credits') return 'credits';
+    if (path === '/admin/users') return 'users';
+    if (path === '/admin/alerts') return 'alerts';
+    return 'dashboard';
+  });
+
+  // Listen for URL changes and update route accordingly
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const path = window.location.pathname;
+      if (path === '/admin/packages' && currentRoute !== 'packages') setCurrentRoute('packages');
+      else if (path === '/admin/themes' && currentRoute !== 'themes') setCurrentRoute('themes');
+      else if (path === '/admin/prompts' && currentRoute !== 'prompts') setCurrentRoute('prompts');
+      else if (path === '/admin/credits' && currentRoute !== 'credits') setCurrentRoute('credits');
+      else if (path === '/admin/users' && currentRoute !== 'users') setCurrentRoute('users');
+      else if (path === '/admin/alerts' && currentRoute !== 'alerts') setCurrentRoute('alerts');
+      else if (path === '/admin' && currentRoute !== 'dashboard') setCurrentRoute('dashboard');
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, [currentRoute]);
+
+  // Update URL when route changes via navigation
+  const handleRouteChange = (route: AdminRoute) => {
+    const path = route === 'dashboard' ? '/admin' : `/admin/${route}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+    }
+    setCurrentRoute(route);
+  };
 
   const renderContent = () => {
     switch (currentRoute) {
@@ -55,7 +91,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  return <AdminLayoutSimple currentRoute={currentRoute} onRouteChange={setCurrentRoute}>{renderContent()}</AdminLayoutSimple>;
+  return <AdminLayoutSimple currentRoute={currentRoute} onRouteChange={handleRouteChange}>{renderContent()}</AdminLayoutSimple>;
 };
 
 export default AdminDashboard;

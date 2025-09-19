@@ -5,6 +5,7 @@
  */
 
 import { promptDatabaseService } from './promptDatabaseService';
+import { PhotoPackagesService, type PackageTheme } from './photoPackagesService';
 
 export interface PromptTemplate {
   id: string;
@@ -309,6 +310,63 @@ class PromptService {
   }
 
   /**
+   * Generate a prompt using package theme if available, with fallback to database/localStorage
+   */
+  public async generatePromptWithPackage(
+    type: 'single' | 'couple' | 'family',
+    style: string,
+    customPrompt: string = '',
+    familyMemberCount: number = 3,
+    packageTheme?: PackageTheme
+  ): Promise<string> {
+    // First try package theme if provided
+    if (packageTheme?.prompt_template) {
+      try {
+        let prompt = packageTheme.prompt_template;
+        
+        // Replace package-specific variables
+        const variables = packageTheme.prompt_variables || {};
+        prompt = prompt
+          .replace(/{photoType}/g, type)
+          .replace(/{familyMemberCount}/g, familyMemberCount.toString())
+          .replace(/{customPrompt}/g, customPrompt)
+          .replace(/{style}/g, style);
+        
+        // Handle enhance section for package themes
+        if (prompt.includes('{enhanceSection}')) {
+          const enhanceSection = customPrompt?.trim() 
+            ? `\n\nENHANCE: ${customPrompt}` 
+            : '';
+          prompt = prompt.replace(/{enhanceSection}/g, enhanceSection);
+        }
+        
+        // Apply conditional sections based on photo type
+        if (packageTheme.conditional_sections) {
+          for (const section of packageTheme.conditional_sections) {
+            if (section.condition && section.condition.photoType === type) {
+              prompt += ' ' + section.content;
+            }
+          }
+        }
+        
+        // Replace any additional variables from prompt_variables
+        for (const [key, value] of Object.entries(variables)) {
+          const regex = new RegExp(`{${key}}`, 'g');
+          prompt = prompt.replace(regex, value.toString());
+        }
+        
+        if (import.meta.env.DEV) console.log(`[PromptService] Using package theme template for ${type}: ${packageTheme.name}`);
+        return prompt;
+      } catch (error) {
+        console.warn('Failed to use package theme template, falling back:', error);
+      }
+    }
+    
+    // Fallback to standard prompt generation
+    return this.generatePrompt(type, style, customPrompt, familyMemberCount);
+  }
+
+  /**
    * Generate a prompt for a specific style and parameters
    */
   public async generatePrompt(
@@ -399,16 +457,88 @@ class PromptService {
   }
 
   /**
-   * Get available variables for a prompt type
+   * Get package theme by style name if available
    */
-  public getAvailableVariables(type: 'single' | 'couple' | 'family'): string[] {
-    const baseVariables = ['{style}', '{enhanceSection}'];
+  public async getPackageThemeByStyle(
+    packageId: string,
+    styleName: string
+  ): Promise<PackageTheme | null> {
+    try {
+      const themes = await PhotoPackagesService.getPackageThemes(packageId, true);
+      return themes.find(theme => theme.name === styleName || theme.id === styleName) || null;
+    } catch (error) {
+      console.warn('Failed to get package theme by style:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get available variables for a prompt type (including package variables)
+   */
+  public getAvailableVariables(
+    type: 'single' | 'couple' | 'family',
+    packageTheme?: PackageTheme
+  ): string[] {
+    const baseVariables = ['{style}', '{enhanceSection}', '{photoType}'];
     
     if (type === 'family') {
       baseVariables.push('{familyMemberCount}');
     }
     
+    // Add package-specific variables if available
+    if (packageTheme?.prompt_variables) {
+      const packageVars = Object.keys(packageTheme.prompt_variables).map(key => `{${key}}`);
+      baseVariables.push(...packageVars);
+    }
+    
     return baseVariables;
+  }
+
+  /**
+   * Validate package theme prompt template
+   */
+  public validatePackagePrompt(packageTheme: PackageTheme): {
+    isValid: boolean;
+    missingVariables: string[];
+    warnings: string[];
+  } {
+    const result = {
+      isValid: true,
+      missingVariables: [] as string[],
+      warnings: [] as string[]
+    };
+
+    if (!packageTheme.prompt_template) {
+      result.isValid = false;
+      result.warnings.push('No prompt template provided');
+      return result;
+    }
+
+    const template = packageTheme.prompt_template;
+    const requiredVars = ['{photoType}', '{style}'];
+    const recommendedVars = ['{customPrompt}', '{enhanceSection}'];
+
+    // Check for required variables
+    for (const variable of requiredVars) {
+      if (!template.includes(variable)) {
+        result.missingVariables.push(variable);
+        result.isValid = false;
+      }
+    }
+
+    // Check for recommended variables
+    for (const variable of recommendedVars) {
+      if (!template.includes(variable)) {
+        result.warnings.push(`Recommended variable ${variable} not found`);
+      }
+    }
+
+    // Check for family member count variable if template mentions family
+    if (template.toLowerCase().includes('family') && !template.includes('{familyMemberCount}')) {
+      result.warnings.push('Template mentions family but missing {familyMemberCount} variable');
+    }
+
+    return result;
   }
 
   /**
