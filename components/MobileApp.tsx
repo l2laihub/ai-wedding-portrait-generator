@@ -71,6 +71,11 @@ interface MobileAppProps {
   setShowLoginModal: (show: boolean) => void;
   setShowProfileModal: (show: boolean) => void;
   setLoginMode: (mode: 'signin' | 'signup') => void;
+  // Package-related props
+  selectedPackage?: any;
+  showPackagePicker?: boolean;
+  setShowPackagePicker?: (show: boolean) => void;
+  onPackageSelected?: (pkg: any) => void;
   // Additional mobile-specific props
   stylesToGenerate?: string[];
   generationProgress?: Array<{

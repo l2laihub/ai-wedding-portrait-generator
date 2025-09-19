@@ -387,6 +387,11 @@ function App({ navigate }: AppProps) {
               ? { ...p, status, startTime: status === 'in_progress' ? Date.now() : p.startTime }
               : p
           ));
+        },
+        {
+          packageId: packageInfo.id,
+          tierId: 'default', // TODO: Add proper tier support
+          themes: themes // Pass the original themes with full prompt data
         }
       );
       
@@ -1457,8 +1462,7 @@ function App({ navigate }: AppProps) {
     );
   }
 
-  // Use desktop view on mobile when image is uploaded (for package features)
-  if (isMobile && appReady && !sourceImageUrl) {
+  if (isMobile && appReady) {
     return (
       <MobileApp 
         navigate={navigate}
@@ -1490,6 +1494,11 @@ function App({ navigate }: AppProps) {
         stylesToGenerate={currentStyles}
         generationProgress={generationProgress}
         resetState={resetState}
+        // Package-related props
+        selectedPackage={selectedPackage}
+        showPackagePicker={showPackagePicker}
+        setShowPackagePicker={setShowPackagePicker}
+        onPackageSelected={handlePackageSelected}
       />
     );
   }
@@ -1521,7 +1530,7 @@ function App({ navigate }: AppProps) {
       />
       
       <main className={getMainClasses()}>
-        <div className={isMobile ? "space-y-4" : "space-y-8"}>
+        <div className={`${isMobile ? "space-y-4" : "space-y-8"} max-w-4xl mx-auto`}>
           <SuspensePhotoTypeSelector
             photoType={photoType}
             onPhotoTypeChange={setPhotoType}
