@@ -59,56 +59,191 @@ const DISPLAY_DAILY_LIMIT = 3; // What we show to users
 
 class CreditsService {
   /**
-   * Get current user's credit balance
+   * Get current user's credit balance with retry logic
    */
   async getBalance(): Promise<CreditBalance> {
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+
+    const user = authService.getCurrentUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Check cache first for recent data
+    const cacheKey = `credit_balance_${user.id}`;
+    const cached = this.getCachedBalance(cacheKey);
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Get user credits with automatic daily reset
+        const { data, error } = await supabase.rpc(
+          'get_user_credits_with_reset',
+          { p_user_id: user.id }
+        );
+
+        if (error) {
+          // Check if it's a network/connection error that we should retry
+          if (this.shouldRetryError(error) && attempt < maxRetries) {
+            console.warn(`Credit balance attempt ${attempt} failed, retrying:`, error.message);
+            await this.delay(baseDelay * attempt);
+            continue;
+          }
+          
+          console.error('Error getting credit balance:', error);
+          
+          // Return cached data if available for connection errors
+          if (cached && this.isConnectionError(error)) {
+            console.log('Using cached credit balance due to connection error');
+            return cached;
+          }
+          
+          throw new Error('Failed to get credit balance');
+        }
+
+        // Handle the data which is an array from the database function
+        const creditsArray = Array.isArray(data) ? data : [data];
+        const credits = creditsArray[0] || {
+          ret_free_credits_used_today: 0,
+          ret_paid_credits: 0,
+          ret_bonus_credits: 0,
+          ret_last_free_reset: new Date().toISOString().split('T')[0]
+        };
+
+        const freeCreditsRemaining = Math.max(0, FREE_DAILY_LIMIT - (credits.ret_free_credits_used_today || 0));
+        const totalAvailable = freeCreditsRemaining + (credits.ret_paid_credits || 0) + (credits.ret_bonus_credits || 0);
+
+        const balance = {
+          freeCreditsUsed: credits.ret_free_credits_used_today || 0,
+          freeCreditsRemaining,
+          paidCredits: credits.ret_paid_credits || 0,
+          bonusCredits: credits.ret_bonus_credits || 0,
+          totalAvailable,
+          canUseCredits: totalAvailable > 0
+        };
+
+        // Cache the successful result
+        this.setCachedBalance(cacheKey, balance);
+        
+        return balance;
+
+      } catch (error: any) {
+        // Check if it's a network/connection error that we should retry
+        if (this.shouldRetryError(error) && attempt < maxRetries) {
+          console.warn(`Credit balance attempt ${attempt} failed, retrying:`, error.message);
+          await this.delay(baseDelay * attempt);
+          continue;
+        }
+
+        console.error('Failed to get credit balance:', error);
+        
+        // Return cached data if available for connection errors
+        if (cached && this.isConnectionError(error)) {
+          console.log('Using cached credit balance due to connection error');
+          return cached;
+        }
+
+        // Return safe defaults as final fallback
+        return {
+          freeCreditsUsed: 0,
+          freeCreditsRemaining: 0,
+          paidCredits: 0,
+          bonusCredits: 0,
+          totalAvailable: 0,
+          canUseCredits: false
+        };
+      }
+    }
+
+    // This should never be reached, but added for completeness
+    return {
+      freeCreditsUsed: 0,
+      freeCreditsRemaining: 0,
+      paidCredits: 0,
+      bonusCredits: 0,
+      totalAvailable: 0,
+      canUseCredits: false
+    };
+  }
+
+  /**
+   * Check if error should trigger a retry
+   */
+  private shouldRetryError(error: any): boolean {
+    if (!error) return false;
+    
+    const message = error.message?.toLowerCase() || '';
+    const code = error.code || '';
+    
+    return (
+      message.includes('failed to fetch') ||
+      message.includes('network error') ||
+      message.includes('connection') ||
+      message.includes('timeout') ||
+      code === 'NETWORK_ERROR' ||
+      code === 'CONNECTION_ERROR'
+    );
+  }
+
+  /**
+   * Check if error is a connection-related error
+   */
+  private isConnectionError(error: any): boolean {
+    if (!error) return false;
+    
+    const message = error.message?.toLowerCase() || '';
+    return (
+      message.includes('failed to fetch') ||
+      message.includes('net::err_connection') ||
+      message.includes('network error') ||
+      message.includes('connection')
+    );
+  }
+
+  /**
+   * Delay helper for retry logic
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get cached balance if available and recent
+   */
+  private getCachedBalance(cacheKey: string): CreditBalance | null {
     try {
-      const user = authService.getCurrentUser();
-      if (!user) {
-        throw new Error('User not authenticated');
+      if (typeof window === 'undefined') return null;
+      
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return null;
+      
+      const { balance, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      const maxAge = 30000; // 30 seconds cache
+      
+      if (now - timestamp < maxAge) {
+        return balance;
       }
-
-      // Get user credits with automatic daily reset
-      const { data, error } = await supabase.rpc(
-        'get_user_credits_with_reset',
-        { p_user_id: user.id }
-      );
-
-      if (error) {
-        console.error('Error getting credit balance:', error);
-        throw new Error('Failed to get credit balance');
-      }
-
-      // Handle the data which is an array from the database function
-      const creditsArray = Array.isArray(data) ? data : [data];
-      const credits = creditsArray[0] || {
-        ret_free_credits_used_today: 0,
-        ret_paid_credits: 0,
-        ret_bonus_credits: 0,
-        ret_last_free_reset: new Date().toISOString().split('T')[0]
-      };
-
-      const freeCreditsRemaining = Math.max(0, FREE_DAILY_LIMIT - (credits.ret_free_credits_used_today || 0));
-      const totalAvailable = freeCreditsRemaining + (credits.ret_paid_credits || 0) + (credits.ret_bonus_credits || 0);
-
-      return {
-        freeCreditsUsed: credits.ret_free_credits_used_today || 0,
-        freeCreditsRemaining,
-        paidCredits: credits.ret_paid_credits || 0,
-        bonusCredits: credits.ret_bonus_credits || 0,
-        totalAvailable,
-        canUseCredits: totalAvailable > 0
-      };
     } catch (error) {
-      console.error('Failed to get credit balance:', error);
-      return {
-        freeCreditsUsed: 0,
-        freeCreditsRemaining: 0,
-        paidCredits: 0,
-        bonusCredits: 0,
-        totalAvailable: 0,
-        canUseCredits: false
+      console.warn('Error reading cached balance:', error);
+    }
+    return null;
+  }
+
+  /**
+   * Cache balance data
+   */
+  private setCachedBalance(cacheKey: string, balance: CreditBalance): void {
+    try {
+      if (typeof window === 'undefined') return;
+      
+      const cached = {
+        balance,
+        timestamp: Date.now()
       };
+      localStorage.setItem(cacheKey, JSON.stringify(cached));
+    } catch (error) {
+      console.warn('Error caching balance:', error);
     }
   }
 

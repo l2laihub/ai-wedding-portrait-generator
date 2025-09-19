@@ -313,6 +313,7 @@ class SecureGeminiService {
   public async generatePortrait(options: GenerationOptions): Promise<GenerationResult> {
     const { imageFile, prompt, style, retryCount = 0, packageId, tierId, themeId } = options
     let usageId: string | undefined
+    let usageResult: any = null
     const startTime = Date.now()
 
     try {
@@ -327,7 +328,7 @@ class SecureGeminiService {
         }
 
         // Process package usage and deduct credits
-        const usageResult = await this.processPackageUsage(
+        usageResult = await this.processPackageUsage(
           packageId,
           tierId,
           [themeId || style],
@@ -382,7 +383,7 @@ class SecureGeminiService {
         return {
           ...result,
           usageId,
-          creditsUsed: usageResult.creditsUsed
+          creditsUsed: usageResult?.creditsUsed || 0
         }
       }
 

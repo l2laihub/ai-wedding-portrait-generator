@@ -193,8 +193,7 @@ function App({ navigate }: AppProps) {
     setSelectedPackage(selectedPkg);
     setShowPackagePicker(false);
     
-    // Auto-start generation with selected package
-    handlePackageGenerate(selectedPkg);
+    // Don't auto-start generation - let user click "Start Photo Shoot"
   };
 
   // Package-based generation handler - simplified
@@ -1458,7 +1457,8 @@ function App({ navigate }: AppProps) {
     );
   }
 
-  if (isMobile && appReady) {
+  // Temporarily use desktop view for package features
+  if (isMobile && appReady && !selectedPackage && !showPackagePicker) {
     return (
       <MobileApp 
         navigate={navigate}
@@ -1597,8 +1597,8 @@ function App({ navigate }: AppProps) {
                 </div>
               </div>
               
-              {/* Optional Custom Prompt Input */}
-              {useEnhancedComponents && enhancedSystemReady ? (
+              {/* Optional Custom Prompt Input - only show if no package selected */}
+              {!selectedPackage && useEnhancedComponents && enhancedSystemReady ? (
                 <EnhancedComponentErrorBoundary
                   componentName="EnhancedPromptInput"
                   fallback={
@@ -1621,14 +1621,14 @@ function App({ navigate }: AppProps) {
                     onCustomPromptChange={handleCustomPromptChange}
                   />
                 </EnhancedComponentErrorBoundary>
-              ) : (
+              ) : !selectedPackage ? (
                 <SuspensePromptInput 
                   onSubmit={handleGenerate} 
                   isLoading={isLoading}
                   customPrompt={customPrompt}
                   onCustomPromptChange={handleCustomPromptChange}
                 />
-              )}
+              ) : null}
             </div>
           )}
 

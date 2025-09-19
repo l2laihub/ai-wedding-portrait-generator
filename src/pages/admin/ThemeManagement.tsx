@@ -555,55 +555,187 @@ const ThemeManagement: React.FC = () => {
                   <p className="text-sm mt-1">Create your first package theme to get started</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {packageThemes
-                    .filter(theme => !selectedPackageFilter || theme.package_id === selectedPackageFilter)
-                    .map((theme) => (
-                    <div
-                      key={theme.id}
-                      className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-purple-500 transition-colors cursor-pointer"
-                      onClick={() => {
-                        setSelectedPackageTheme(theme);
-                        setEditPackageThemeMode(true);
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium text-white">{theme.name}</h4>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {theme.photo_packages?.name} • {theme.photo_packages?.category}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {theme.is_premium && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-900 text-yellow-300 border border-yellow-700">
-                              Premium
-                            </span>
-                          )}
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${
-                            theme.is_active 
-                              ? 'bg-green-900 text-green-300 border-green-700' 
-                              : 'bg-red-900 text-red-300 border-red-700'
-                          }`}>
-                            {theme.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-300 mb-3 line-clamp-2">{theme.description}</p>
-                      <div className="flex items-center justify-between text-xs text-gray-400">
-                        <span>Popularity: {theme.popularity_score}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deletePackageTheme(theme.id);
-                          }}
-                          className="text-red-400 hover:text-red-300 p-1"
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Package Themes List */}
+                  <div className="lg:col-span-1 bg-gray-700 rounded-lg border border-gray-600 p-4">
+                    <h4 className="text-md font-semibold text-white mb-4">
+                      Package Themes ({packageThemes.filter(theme => !selectedPackageFilter || theme.package_id === selectedPackageFilter).length})
+                    </h4>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {packageThemes
+                        .filter(theme => !selectedPackageFilter || theme.package_id === selectedPackageFilter)
+                        .map((theme) => (
+                        <div
+                          key={theme.id}
+                          onClick={() => setSelectedPackageTheme(theme)}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedPackageTheme?.id === theme.id
+                              ? 'border-purple-500 bg-purple-900/20'
+                              : 'border-gray-500 bg-gray-600 hover:border-gray-400'
+                          }`}
                         >
-                          <Icon path={iconPaths.delete} className="w-4 h-4" />
-                        </button>
-                      </div>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-medium text-white text-sm truncate">{theme.name}</h5>
+                              <div className="flex flex-col space-y-1 mt-1">
+                                <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded w-fit">
+                                  {theme.photo_packages?.name}
+                                </span>
+                                <span className="text-xs text-gray-300">Score: {theme.popularity_score || 5}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col space-y-1 ml-2">
+                              {theme.is_active && (
+                                <div className="w-2 h-2 bg-green-500 rounded-full" title="Active" />
+                              )}
+                              {theme.is_premium && (
+                                <Icon path={iconPaths.star} className="w-3 h-3 text-yellow-500" title="Premium" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Package Theme Details */}
+                  <div className="lg:col-span-3 bg-gray-700 rounded-lg border border-gray-600 p-6">
+                    {selectedPackageTheme ? (
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xl font-semibold text-white">{selectedPackageTheme.name}</h4>
+                            <p className="text-gray-400 text-sm mt-1">{selectedPackageTheme.description}</p>
+                            <p className="text-purple-400 text-sm mt-1">{selectedPackageTheme.photo_packages?.name} Package</p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => setEditPackageThemeMode(true)}
+                              className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm flex items-center"
+                            >
+                              <Icon path={iconPaths.edit} className="w-4 h-4 mr-2" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deletePackageTheme(selectedPackageTheme.id)}
+                              className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 text-sm flex items-center"
+                            >
+                              <Icon path={iconPaths.delete} className="w-4 h-4 mr-2" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Theme Details Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Setting Prompt</h5>
+                              <div className="bg-gray-800 rounded-lg p-3">
+                                <p className="text-gray-300 text-sm">{selectedPackageTheme.setting_prompt || 'No setting prompt'}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Clothing Prompt</h5>
+                              <div className="bg-gray-800 rounded-lg p-3">
+                                <p className="text-gray-300 text-sm">{selectedPackageTheme.clothing_prompt || 'No clothing prompt'}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Atmosphere Prompt</h5>
+                              <div className="bg-gray-800 rounded-lg p-3">
+                                <p className="text-gray-300 text-sm">{selectedPackageTheme.atmosphere_prompt || 'No atmosphere prompt'}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Technical Prompt</h5>
+                              <div className="bg-gray-800 rounded-lg p-3">
+                                <p className="text-gray-300 text-sm">{selectedPackageTheme.technical_prompt || 'No technical prompt'}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Style Modifiers</h5>
+                              <div className="bg-gray-800 rounded-lg p-3">
+                                <div className="flex flex-wrap gap-1">
+                                  {(selectedPackageTheme.style_modifiers || []).map((modifier: string, idx: number) => (
+                                    <span key={idx} className="bg-purple-600 text-white px-2 py-1 rounded text-xs">
+                                      {modifier}
+                                    </span>
+                                  ))}
+                                  {(!selectedPackageTheme.style_modifiers || selectedPackageTheme.style_modifiers.length === 0) && (
+                                    <span className="text-gray-400 text-sm">No style modifiers</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Color Palette</h5>
+                              <div className="bg-gray-800 rounded-lg p-3">
+                                <div className="flex flex-wrap gap-2">
+                                  {(selectedPackageTheme.color_palette || []).map((color: string, idx: number) => (
+                                    <div key={idx} className="flex items-center space-x-2">
+                                      <div 
+                                        className="w-4 h-4 rounded border border-gray-600"
+                                        style={{ backgroundColor: color.startsWith('#') ? color : `var(--color-${color})` }}
+                                      />
+                                      <span className="text-white text-sm">{color}</span>
+                                    </div>
+                                  ))}
+                                  {(!selectedPackageTheme.color_palette || selectedPackageTheme.color_palette.length === 0) && (
+                                    <span className="text-gray-400 text-sm">No color palette</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h5 className="font-medium text-white mb-2">Theme Information</h5>
+                              <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 text-sm">Popularity Score:</span>
+                                  <span className="text-white text-sm">{selectedPackageTheme.popularity_score || 5}/10</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 text-sm">Sort Order:</span>
+                                  <span className="text-white text-sm">{selectedPackageTheme.sort_order || 0}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 text-sm">Status:</span>
+                                  <span className={`text-sm ${selectedPackageTheme.is_active ? 'text-green-400' : 'text-red-400'}`}>
+                                    {selectedPackageTheme.is_active ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 text-sm">Premium:</span>
+                                  <span className={`text-sm ${selectedPackageTheme.is_premium ? 'text-yellow-400' : 'text-gray-400'}`}>
+                                    {selectedPackageTheme.is_premium ? 'Yes' : 'No'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 text-sm">Created:</span>
+                                  <span className="text-white text-sm">{new Date(selectedPackageTheme.created_at).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-gray-400">
+                        <Icon path={iconPaths.palette} className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <h4 className="text-lg font-medium text-white mb-2">Select a Package Theme</h4>
+                        <p className="text-gray-400">Choose a theme from the list to view and edit its details</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
