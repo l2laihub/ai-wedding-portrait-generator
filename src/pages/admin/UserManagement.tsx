@@ -148,7 +148,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
           <p className="text-gray-400 text-sm">Total Users</p>
           <p className="text-2xl font-semibold text-white">{totalUsers.toLocaleString()}</p>
@@ -157,6 +157,12 @@ const UserManagement: React.FC = () => {
           <p className="text-gray-400 text-sm">Active Users</p>
           <p className="text-2xl font-semibold text-green-400">
             {users.filter(u => u.status === 'active').length.toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <p className="text-gray-400 text-sm">Total Generations</p>
+          <p className="text-2xl font-semibold text-blue-400">
+            {users.reduce((sum, u) => sum + u.generations, 0).toLocaleString()}
           </p>
         </div>
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -298,7 +304,14 @@ const UserManagement: React.FC = () => {
                       <span className="text-sm text-gray-300 font-medium">{user.credits}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-300">{user.generations.toLocaleString()}</span>
+                      <div className="flex items-center">
+                        <span className={`text-sm font-medium ${user.generations > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                          {user.generations.toLocaleString()}
+                        </span>
+                        {user.generations === 0 && (
+                          <span className="ml-2 text-xs text-gray-500">(No generations)</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-300">
                       {format(user.joinedAt, 'MMM dd, yyyy')}

@@ -56,6 +56,27 @@ export interface SystemStatus {
 }
 
 class AdminService {
+  private calculateUserStatus(lastLogin: string | null, generationCount: number): 'active' | 'inactive' | 'suspended' {
+    // Consider a user active if they've logged in within the last 30 days OR have generated content recently
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    if (lastLogin) {
+      const lastLoginDate = new Date(lastLogin);
+      // Active if logged in within 7 days, or within 30 days with generations
+      if (lastLoginDate > sevenDaysAgo || (lastLoginDate > thirtyDaysAgo && generationCount > 0)) {
+        return 'active';
+      }
+    }
+    
+    // If they have generations but no recent login, still consider them somewhat active
+    if (generationCount > 0) {
+      return 'active';
+    }
+    
+    return 'inactive';
+  }
+
   private async isAdmin(): Promise<boolean> {
     if (import.meta.env.DEV) console.log('🔍 isAdmin: checking auth user...');
     const { data: { user }, error } = await supabase.auth.getUser();
@@ -66,24 +87,26 @@ class AdminService {
       return false;
     }
 
-    // Temporary: Check if user is admin@huybuilds.app directly
-    // TODO: Replace with proper admin_users table lookup once migration is applied
-    if (user.email === 'admin@huybuilds.app') {
-      if (import.meta.env.DEV) console.log('🔍 isAdmin: admin email match = true');
-      return true;
-    }
-
     try {
-      const { data: adminUser } = await supabase
-        .from('admin_users')
+      // Check the role column in the users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
-      return adminUser?.role ? ['admin', 'super_admin'].includes(adminUser.role) : false;
+      if (userError) {
+        console.error('Error checking user role:', userError);
+        // Fallback to email check if we can't query the users table
+        return user.email === 'admin@huybuilds.app';
+      }
+
+      if (import.meta.env.DEV) console.log('🔍 isAdmin: user role =', userData?.role);
+      
+      return userData?.role ? ['admin', 'super_admin'].includes(userData.role) : false;
     } catch (error) {
-      // If admin_users table doesn't exist yet, fall back to email check
-      console.warn('Admin users table not available, using email-based check');
+      // Fallback to email check in case of any errors
+      console.warn('Error checking admin status, using email-based check:', error);
       return user.email === 'admin@huybuilds.app';
     }
   }
@@ -180,24 +203,169 @@ class AdminService {
       const { data: userData, error } = await query;
       if (error) throw error;
 
-      // Get generation counts for each user
+      // Get generation counts for each user from generation_requests table
       const userIds = userData?.map(u => u.id) || [];
-      
-      // Note: usage_analytics might not have user_id field, so we'll use session-based counting
-      // This is a limitation of the current schema - generations aren't directly tied to users
       let generationCountsMap: Record<string, number> = {};
       
+      if (import.meta.env.DEV) console.log('🔍 Fetching generation counts for userIds:', userIds);
+      
       try {
-        const { data: generationCounts } = await supabase
-          .from('usage_analytics')
-          .select('session_id')
-          .not('session_id', 'is', null);
+        // Query generation_requests table which has proper user_id tracking
+        const { data: generationCounts, error } = await supabase
+          .from('generation_requests')
+          .select('user_id')
+          .in('user_id', userIds)
+          .eq('status', 'completed'); // Only count completed generations
 
-        // For now, we can't accurately count per user since usage_analytics doesn't have user_id
-        // We'll show 0 generations per user until this is fixed in the schema
-        console.warn('Cannot count generations per user: usage_analytics table missing user_id field');
+        if (error) {
+          console.error('Error querying generation_requests:', error);
+        }
+
+        if (import.meta.env.DEV) console.log('🔍 Generation counts raw data:', generationCounts);
+
+        if (generationCounts) {
+          // Count generations per user
+          generationCountsMap = generationCounts.reduce((acc, gen) => {
+            acc[gen.user_id] = (acc[gen.user_id] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          
+          if (import.meta.env.DEV) console.log('🔍 Generation counts map:', generationCountsMap);
+        }
       } catch (error) {
-        console.warn('Error fetching generation counts:', error);
+        console.warn('Error fetching generation counts from generation_requests:', error);
+      }
+      
+      // Also try package_usage table for newer generations (merge results)
+      try {
+        // First try with generations_count, then fall back to other possible columns
+        let packageUsage = null;
+        let packageError = null;
+        
+        // Try generations_count first
+        const result1 = await supabase
+          .from('package_usage')
+          .select('user_id, generations_count')
+          .in('user_id', userIds)
+          .eq('status', 'completed');
+          
+        if (result1.error?.code === '42703') {
+          // Column doesn't exist, try generations_used
+          const result2 = await supabase
+            .from('package_usage')
+            .select('user_id, generations_used')
+            .in('user_id', userIds)
+            .eq('status', 'completed');
+            
+          if (result2.error?.code === '42703') {
+            // Try just counting rows per user
+            const result3 = await supabase
+              .from('package_usage')
+              .select('user_id')
+              .in('user_id', userIds)
+              .eq('status', 'completed');
+              
+            packageUsage = result3.data;
+            packageError = result3.error;
+          } else {
+            packageUsage = result2.data?.map(u => ({ 
+              user_id: u.user_id, 
+              generations_count: u.generations_used 
+            }));
+            packageError = result2.error;
+          }
+        } else {
+          packageUsage = result1.data;
+          packageError = result1.error;
+        }
+
+        if (packageError && packageError.code !== '42703') {
+          console.error('Error querying package_usage:', packageError);
+        }
+
+        if (packageUsage) {
+          // Merge counts from package_usage into existing counts
+          if (packageUsage[0] && !('generations_count' in packageUsage[0])) {
+            // Just count rows per user
+            const packageCounts = packageUsage.reduce((acc, usage) => {
+              acc[usage.user_id] = (acc[usage.user_id] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+            
+            Object.entries(packageCounts).forEach(([userId, count]) => {
+              generationCountsMap[userId] = (generationCountsMap[userId] || 0) + count;
+            });
+          } else {
+            // Use the generations_count field
+            packageUsage.forEach(usage => {
+              generationCountsMap[usage.user_id] = (generationCountsMap[usage.user_id] || 0) + (usage.generations_count || 1);
+            });
+          }
+          
+          if (import.meta.env.DEV) console.log('🔍 Updated generation counts after package_usage merge:', generationCountsMap);
+        }
+      } catch (fallbackError) {
+        console.warn('Error fetching from package_usage fallback:', fallbackError);
+      }
+      
+      // Also check portrait_generations table for individual generations
+      try {
+        // First try with generation_status, then fall back to status
+        let portraitGens = null;
+        let portraitError = null;
+        
+        const result1 = await supabase
+          .from('portrait_generations')
+          .select('user_id')
+          .in('user_id', userIds)
+          .eq('generation_status', 'completed');
+          
+        if (result1.error?.code === '42703') {
+          // Column doesn't exist, try 'status'
+          const result2 = await supabase
+            .from('portrait_generations')
+            .select('user_id')
+            .in('user_id', userIds)
+            .eq('status', 'completed');
+            
+          if (result2.error?.code === '42703') {
+            // Just get all records for these users
+            const result3 = await supabase
+              .from('portrait_generations')
+              .select('user_id')
+              .in('user_id', userIds);
+              
+            portraitGens = result3.data;
+            portraitError = result3.error;
+          } else {
+            portraitGens = result2.data;
+            portraitError = result2.error;
+          }
+        } else {
+          portraitGens = result1.data;
+          portraitError = result1.error;
+        }
+
+        if (portraitError && portraitError.code !== '42703') {
+          console.error('Error querying portrait_generations:', portraitError);
+        }
+
+        if (portraitGens) {
+          // Count portrait generations per user
+          const portraitCounts = portraitGens.reduce((acc, gen) => {
+            acc[gen.user_id] = (acc[gen.user_id] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          
+          // Merge with existing counts (add to existing counts)
+          Object.entries(portraitCounts).forEach(([userId, count]) => {
+            generationCountsMap[userId] = (generationCountsMap[userId] || 0) + count;
+          });
+          
+          if (import.meta.env.DEV) console.log('🔍 Final generation counts after all sources:', generationCountsMap);
+        }
+      } catch (portraitError) {
+        console.warn('Error fetching from portrait_generations:', portraitError);
       }
 
       const users: User[] = userData?.map(user => ({
@@ -208,9 +376,7 @@ class AdminService {
         generations: generationCountsMap[user.id] || 0,
         joinedAt: new Date(user.created_at),
         lastActive: user.last_login ? new Date(user.last_login) : new Date(user.created_at),
-        status: user.last_login && new Date(user.last_login) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-          ? 'active' 
-          : 'inactive'
+        status: this.calculateUserStatus(user.last_login, generationCountsMap[user.id] || 0)
       })) || [];
 
       // Apply status filter after mapping
@@ -645,9 +811,7 @@ class AdminService {
           generations: 0, // Will be calculated separately if needed
           joinedAt: new Date(user.created_at),
           lastActive: user.last_login ? new Date(user.last_login) : new Date(user.created_at),
-          status: (user.last_login && new Date(user.last_login) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-            ? 'active' 
-            : 'inactive') as 'active' | 'inactive' | 'suspended',
+          status: this.calculateUserStatus(user.last_login, 0) as 'active' | 'inactive' | 'suspended',
           paidCredits: credits.paid_credits || 0,
           bonusCredits: credits.bonus_credits || 0,
           totalCredits: (credits.paid_credits || 0) + (credits.bonus_credits || 0),
