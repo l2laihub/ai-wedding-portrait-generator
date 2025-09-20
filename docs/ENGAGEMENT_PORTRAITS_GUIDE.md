@@ -308,7 +308,7 @@ Each theme includes a curated color palette to ensure cohesive results. The AI g
 
 ### Database Structure
 - Package ID: Auto-generated UUID
-- Theme Variations: 12 unique themes (2 premium)
+- Theme Variations: 62 unique themes (2 premium)
 - Prompt Components: Setting, Clothing, Atmosphere, Technical
 - Metadata: Style modifiers, color palettes, inspiration references
 

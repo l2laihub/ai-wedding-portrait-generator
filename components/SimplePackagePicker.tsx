@@ -41,22 +41,22 @@ export default function SimplePackagePicker({ onPackageSelected, className = '' 
       'wedding-portraits': {
         icon: '💍',
         gradient: 'from-pink-500 to-rose-400',
-        description: '12 classic wedding themes including Rustic Barn, Beach Bohemian, and Fairytale Castle'
+        description: '20 classic wedding themes including Rustic Barn, Beach Bohemian, and Fairytale Castle, and more'
       },
       'engagement-portraits': {
         icon: '💕',
         gradient: 'from-red-500 to-pink-400', 
-        description: '3 romantic engagement themes: Classic Romance, Golden Hour, and Urban Romance'
+        description: '12 romantic engagement themes: Classic Romance, Golden Hour, and Urban Romance, and more'
       },
       'professional-headshots': {
         icon: '👔',
         gradient: 'from-blue-600 to-indigo-500',
-        description: 'LinkedIn-ready professional headshots: Executive, Creative, and Casual styles'
+        description: '12 professional LinkedIn-ready headshots: Executive, Creative, and Casual styles, and more'
       },
       'anniversary-photos': {
         icon: '🥂',
         gradient: 'from-purple-500 to-indigo-400',
-        description: 'Celebrate your love milestone with Romantic, Memory Lane, and Celebration themes'
+        description: 'Celebrate your love milestone with 12 romantic anniversary themes: Romantic, Memory Lane, and Celebration themes, and more'
       }
     };
 

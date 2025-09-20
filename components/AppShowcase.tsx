@@ -9,7 +9,7 @@ const AppShowcase: React.FC = () => {
       description: 'AI-powered wedding portrait generator - this app!',
       icon: '💑',
       gradient: 'from-purple-500 to-pink-500',
-      features: ['Wedding Portraits', '12 Unique Styles', 'Free Download'],
+      features: ['Wedding Portraits', '62 Unique Styles', 'Free Download'],
       tag: 'You are here'
     },
     {

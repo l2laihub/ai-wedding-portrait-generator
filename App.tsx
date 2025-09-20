@@ -1867,7 +1867,7 @@ function App({ navigate }: AppProps) {
                     <span className="text-2xl">✨</span>
                   </div>
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-lg transition-colors duration-300">2. AI Magic</h4>
-                  <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Our AI generates 3 unique wedding portraits from 12 beautiful styles</p>
+                  <p className="text-gray-600 dark:text-gray-300 transition-colors duration-300">Our AI generates 3 unique wedding portraits from 62 beautiful styles</p>
                 </div>
                 <div className="text-center">
                   <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -1879,7 +1879,7 @@ function App({ navigate }: AppProps) {
               </div>
               
               {/* Theme Examples */}
-              <div className="mt-8 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
+              {/* <div className="mt-8 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
                 <h4 className="font-semibold text-center text-gray-900 dark:text-white mb-4 transition-colors duration-300">12 Amazing Wedding Themes</h4>
                 <div className="flex flex-wrap justify-center gap-2 text-sm">
                   <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Classic & Timeless</span>
@@ -1895,7 +1895,7 @@ function App({ navigate }: AppProps) {
                   <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Japanese Cherry Blossom</span>
                   <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-teal-500/10 text-gray-700 dark:text-gray-300 rounded-full">Steampunk Victorian</span>
                 </div>
-              </div>
+              </div> */}
             </div>
             );
           })()}
